@@ -32,6 +32,24 @@ public class MIOServerKit
 
         return data
     }
+    
+    public func loadSettingsPlist(path:String) -> [String : Any]
+    {
+        let xml = FileManager.default.contents(atPath: path)
+        
+        do {
+            guard let items = try PropertyListSerialization.propertyList(from: xml!, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
+                return [:]
+            }
+            
+            return items
+        }
+        catch let error {
+            print(error.localizedDescription)
+            return [:]
+        }
+    }
 
+    
 }
 
