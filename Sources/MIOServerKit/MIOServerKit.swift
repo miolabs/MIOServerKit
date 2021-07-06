@@ -5,12 +5,29 @@ import Foundation
 import FoundationNetworking
 #endif
 
+import ArgumentParser
+
 public class MIOServerKit
 {
+    struct ServerOption:ParsableCommand
+    {
+        @Option(name: .shortAndLong, help: "The number of times to repeat 'phrase'.")
+        var serverPath: String?
+
+        @Option(name: .shortAndLong, help: "The number of times to repeat 'phrase'.")
+        var documentPath: String?
+        
+//        @Argument
+//        var port: Int32
+    }
+    
+    
     public static let shared = MIOServerKit()
 
     // Initialization
     private init( ) {
+        parse_command_line_arguments()
+        settings = loadSettingsPlist(path: "\(serverPath)/App.plist")
     }
     
     public func urlDataRequest(_ request:URLRequest) throws -> Data? {
@@ -32,9 +49,9 @@ public class MIOServerKit
 
         return data
     }
-    
-    public func loadSettingsPlist(path:String) -> [String : Any]
-    {
+            
+    public func loadSettingsPlist(path:String) -> [String : Any]{
+        
         let xml = FileManager.default.contents(atPath: path)
         
         do {
@@ -49,7 +66,27 @@ public class MIOServerKit
             return [:]
         }
     }
-
     
+    var _serverPath:String?
+    public var serverPath:String { return _serverPath ?? FileManager().currentDirectoryPath }
+    
+    var _documentPath:String?
+    public var documentPath:String { return _documentPath ?? FileManager().currentDirectoryPath }
+    
+    func parse_command_line_arguments(){
+        do {
+            let options = try ServerOption.parse( Array ( CommandLine.arguments.dropFirst() ) )
+            _serverPath = options.serverPath
+            _documentPath = options.documentPath
+        }
+        catch {
+            NSLog(error.localizedDescription)
+        }
+    }
+    
+    var settings:[String:Any] = [:]
+    public var serverVersion:String {
+        return settings.keys.contains("Version") ? settings["Version"] as! String : "UNKOWN"
+    }
 }
 
