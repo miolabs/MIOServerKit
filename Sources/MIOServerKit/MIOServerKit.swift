@@ -75,7 +75,8 @@ public class MIOServerKit
     
     func parse_command_line_arguments(){
         do {
-            let options = try ServerOption.parse( Array ( CommandLine.arguments.dropFirst() ) )
+            let args = CommandLine.arguments.last == "&" ? Array ( CommandLine.arguments.dropFirst().dropLast() ) : Array ( CommandLine.arguments.dropFirst() )
+            let options = try ServerOption.parse( args )
             _serverPath = options.serverPath
             _documentPath = options.documentPath
         }
