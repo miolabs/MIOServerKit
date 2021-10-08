@@ -1,5 +1,9 @@
 
 import Foundation
+import Kitura
+import HeliumLogger
+import Foundation
+
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -28,6 +32,13 @@ public class MIOServerKit
     private init( ) {
         parse_command_line_arguments()
         settings = loadSettingsPlist(path: "\(serverPath)/App.plist")
+        
+        HeliumLogger.use(.info)
+    }
+    
+    public func run (port:Int, router:MSKServerRouter<Any>) {
+        Kitura.addHTTPServer(onPort: port, with: router.router)
+        Kitura.run()
     }
     
     public func urlDataRequest(_ request:URLRequest) throws -> Data? {
