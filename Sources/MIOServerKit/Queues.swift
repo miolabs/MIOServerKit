@@ -11,7 +11,7 @@ var g_sync_queue: [ String: DispatchQueue ] = [:]
 
 public func sync_queue_id ( _ key: String ) -> DispatchQueue {
     if g_sync_queue[ key ] == nil {
-        g_sync_queue[ key ] = DispatchQueue(label: "com.dual-link.server." + key )
+        g_sync_queue[ key ] = DispatchQueue(label: "com.miolabs.server." + key )
     }
     
     return g_sync_queue[ key ]!

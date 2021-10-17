@@ -15,14 +15,11 @@ public class MIOServerKit
 {
     struct ServerOption:ParsableCommand
     {
-        @Option(name: .shortAndLong, help: "The number of times to repeat 'phrase'.")
+        @Option(name: .shortAndLong, help: "The path server files.")
         var serverPath: String?
 
-        @Option(name: .shortAndLong, help: "The number of times to repeat 'phrase'.")
+        @Option(name: .shortAndLong, help: "The path of document files.")
         var documentPath: String?
-        
-//        @Argument
-//        var port: Int32
     }
     
     
