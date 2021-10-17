@@ -10,6 +10,7 @@ import FoundationNetworking
 #endif
 
 import ArgumentParser
+import MIOCore
 
 public class MIOServerKit
 {
@@ -39,23 +40,11 @@ public class MIOServerKit
     }
     
     public func urlDataRequest(_ request:URLRequest) throws -> Data? {
-        
-        let config = URLSessionConfiguration.default
-        config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        config.urlCache = nil
-
-        let session = URLSession.init(configuration: config)
-        
-        let (data, _, error) = session.synchronousDataTask(with: request)
-                         
-        if error != nil {
-            print(error!.localizedDescription)
-            throw error!
-        }
-        
-        // TODO: Check response code
-
-        return data
+        return try MIOCoreURLDataRequest_sync(request)
+    }
+    
+    public func urlJSONRequest(_ request:URLRequest) throws -> Any? {
+        return try MIOCoreURLJSONRequest_sync(request)
     }
             
     public func loadSettingsPlist(path:String) -> [String : Any]{
