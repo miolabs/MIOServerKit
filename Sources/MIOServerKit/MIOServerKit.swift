@@ -88,3 +88,30 @@ public class MIOServerKit
     }
 }
 
+extension MSKRouterResponse {
+
+    // TODO: Used in auth server...
+    public func sendOKResponse(json : Any? = nil) -> MSKRouterResponse {
+
+        self.status(.OK)
+        if json == nil {
+            self.send(json: ["status" : "OK"])
+        } else if json is [Any] || json is [String: Any] {
+            self.send(json: ["status" : "OK", "data" : json! ])
+        }
+
+        return self
+    }
+
+    // TODO: Used in redsys...
+    public func sendErrorResponse(_ error : Error, httpStatus : HTTPStatusCode = .badRequest) -> MSKRouterResponse {
+
+        self.status(httpStatus)
+
+        self.send(json: ["status" : "Error",
+                    "error" : error.localizedDescription])
+
+        return self
+    }
+    
+}
