@@ -220,6 +220,13 @@ public class EndpointTreeNode<T> {
         
         return cloned
     }
+    
+    func clean ( ) {
+        value     = nil
+        nodes     = [:]
+        var_nodes = []
+        null_node = nil
+    }
 
     func insert ( _ ep: EndpointTreeLeaf ) {
         // CASO MINIMAL
@@ -262,9 +269,7 @@ public class EndpointTreeNode<T> {
             //   - book
             if root_diff.common.is_empty() {
                 let cloned = self.clone( )
-                
-                value = nil
-                nodes = [:]
+                self.clean( )
                 
                 insert_subnode( cloned )
                 insert_subnode( node )
@@ -287,11 +292,12 @@ public class EndpointTreeNode<T> {
                 //       - A1
                 node.value!.set_path( root_diff.right )
 
-                
                 if !root_diff.left.is_empty() {
                     let cloned = self.clone( )
                     cloned.value!.set_path( root_diff.left )
 
+                    self.clean( )
+                    
                     value = EndpointTreeLeaf( root_diff.common )
                     
                     insert_subnode( cloned )
@@ -306,6 +312,19 @@ public class EndpointTreeNode<T> {
     // Leaf deriva de node? Y es el node el que tiene el Path!??
     func insert_subnode ( _ n: EndpointTreeNode ) {
         if n.is_null_node() {
+            // CASE:
+            // HAS /hook/version
+            // INS /hook
+            // OUT:
+            //  (null)
+            //     - version
+            //     - /
+            if value != nil {
+                let cloned = self.clone( )
+                self.clean( )
+                insert_subnode( cloned )
+            }
+            
             // overwrite? should we launch exception?
             null_node = n
         } else if n.starts_with_var() {

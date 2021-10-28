@@ -52,7 +52,7 @@ open class MSKRouter<T> {
         
         let ret = MSKRouter<T>( )
         
-        root.insert( Endpoint<T>( url ) )
+        root.insert( EndpointTreeLeaf( url ) )
         ret.root = root.find( RouterPath( url ) )!
         
         return ret
