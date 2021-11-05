@@ -65,6 +65,13 @@ public struct ResponseContext {
 }
 
 
+public protocol RouterContextProtocol {
+    func queryParam ( _ name: String ) -> String?
+    func urlParam<T> ( _ name: String ) throws -> T
+    func bodyParam (_ name: String) -> Any?
+}
+
+
 @objc open class RouterContext : MIOCoreContext
 {
     public var request: MSKRouterRequest
@@ -75,14 +82,30 @@ public struct ResponseContext {
         self.response = response
     }
     
+    public init ( ) {
+        self.request = MSKRouterRequest( )
+        self.response = MSKRouterResponse( )
+    }
+    
     open func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )
     }
     
+    open func queryParam ( _ name: String ) -> String? {
+        return request.queryParameters[ name ]
+    }
+    
+    
+    var _body_as_json: [String : Any]? = nil
+    
     public func bodyParam (_ name: String) -> Any? {
-        guard let body = try? request.bodyAsJSON() else { return nil }
-        if !body.keys.contains(name) { return nil }
-        return body[ name ]!
+        if _body_as_json == nil {
+            guard let body = try? request.bodyAsJSON() else { return nil }
+            _body_as_json = body
+        }
+        
+        if !_body_as_json!.keys.contains(name) { return nil }
+        return _body_as_json![ name ]!
     }
 
     

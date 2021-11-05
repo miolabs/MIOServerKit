@@ -2,7 +2,6 @@
 import Foundation
 import Kitura
 import HeliumLogger
-import Foundation
 
 
 #if canImport(FoundationNetworking)
