@@ -30,12 +30,14 @@ open class MSKRouterResponse
     
     @discardableResult
     public func send ( json:[Any] ) -> MSKRouterResponse {
+        response!.headers["Content-Type"] = "application/json"
         response!.send(json: json)
         return self
     }
     
     @discardableResult
     public func send ( json:[String:Any] ) -> MSKRouterResponse {
+        response!.headers["Content-Type"] = "application/json"
         response!.send(json: json)
         return self
     }

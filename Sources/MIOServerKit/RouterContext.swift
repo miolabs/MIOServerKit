@@ -72,7 +72,7 @@ public protocol RouterContextProtocol {
 }
 
 
-@objc open class RouterContext : MIOCoreContext
+@objc open class RouterContext : MIOCoreContext, RouterContextProtocol
 {
     public var request: MSKRouterRequest
     public var response: MSKRouterResponse
@@ -112,11 +112,14 @@ public protocol RouterContextProtocol {
     public func sendOKResponse ( _ json : Any? = nil ) throws {
         response.status(.OK)
         
-        if json is Data {
-            response.send(data: json as! Data )
+        if json is nil {
+            
+        } else if json is Data {
+            response.send( data: json as! Data )
         } else if let ret = json as? ResponseContext {
-            response.send(json: ret.asJson( ) )
-
+            response.send( json: ret.asJson( ) )
+        } else if let ret = json as? String {
+            response.send( ret )
         } else {
             let response_json = json is [Any] || json is [String: Any] ? ["status" : "OK", "data" : json! ]
                               :                                          ["status" : "OK"]
