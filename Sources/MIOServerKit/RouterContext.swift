@@ -112,7 +112,7 @@ public protocol RouterContextProtocol {
     public func sendOKResponse ( _ json : Any? = nil ) throws {
         response.status(.OK)
         
-        if json is nil {
+        if json == nil {
             
         } else if json is Data {
             response.send( data: json as! Data )
