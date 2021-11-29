@@ -18,9 +18,9 @@ let package = Package(
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "0.4.0"),
-        .package(url: "https://github.com/Kitura/Kitura.git", from: "2.9.1"),
-        .package(url: "https://github.com/IBM-Swift/HeliumLogger.git", from: "1.9.0"),
-        .package(url: "https://github.com/IBM-Swift/Kitura-CORS.git", from: "2.1.1"),
+        .package(url: "https://github.com/Kitura/Kitura.git", from: "2.9.200"),
+        .package(url: "https://github.com/Kitura/HeliumLogger.git", from: "1.9.200"),
+        .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
         .package(url: "https://github.com/miolabs/MIOCore.git", .branch("master")),
         // .package(url: "https://github.com/miolabs/MIOCoreData.git", .branch("master")),
         // .package(url: "https://github.com/miolabs/MIODB.git", .branch("master")),
