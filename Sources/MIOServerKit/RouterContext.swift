@@ -68,7 +68,7 @@ public struct ResponseContext {
 public protocol RouterContextProtocol {
     func queryParam ( _ name: String ) -> String?
     func urlParam<T> ( _ name: String ) throws -> T
-    func bodyParam (_ name: String) -> Any?
+    func bodyParam<T> (_ name: String, optional: Bool) throws -> T?
 }
 
 
@@ -98,14 +98,31 @@ public protocol RouterContextProtocol {
     
     var _body_as_json: [String : Any]? = nil
     
-    public func bodyParam (_ name: String) -> Any? {
-        if _body_as_json == nil {
-            guard let body = try? request.bodyAsJSON() else { return nil }
-            _body_as_json = body
+    var _body: [String:Any]? = nil
+    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
+        if _body == nil {
+            let json = try? request.bodyAsJSON()
+            
+            if json == nil {
+                if optional { return nil }
+                throw MIOError.missingJSONBody( )
+            }
+            
+            _body = json
         }
         
-        if !_body_as_json!.keys.contains(name) { return nil }
-        return _body_as_json![ name ]!
+        if !_body!.keys.contains(name) {
+            if optional { return nil }
+            throw MIOError.fieldNotFound( name )
+        }
+        
+        
+        if let value = _body![ name ] as? T {
+            return value
+        }
+
+        if optional { return nil }
+        throw MIOError.fieldNotFound( name )
     }
 
     
