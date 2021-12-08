@@ -81,6 +81,9 @@ public class MIOServerKit
         }
     }
     
+    public func settingValue(forKey key:String) -> Any? {
+        settings.keys.contains(key) ? settings[key]! : nil
+    }
     var settings:[String:Any] = [:]
     public var serverVersion:String {
         return settings.keys.contains("Version") ? settings["Version"] as! String : "UNKOWN"
