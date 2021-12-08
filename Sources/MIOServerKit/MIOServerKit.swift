@@ -48,10 +48,13 @@ public class MIOServerKit
             
     public func loadSettingsPlist(path:String) -> [String : Any]{
         
-        let xml = FileManager.default.contents(atPath: path)
+        guard let xml = FileManager.default.contents(atPath: path) else {
+            print("MIOServerKit: Path not found: \(path)")
+            return [:]
+        }
         
         do {
-            guard let items = try PropertyListSerialization.propertyList(from: xml!, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
+            guard let items = try PropertyListSerialization.propertyList(from: xml, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
                 return [:]
             }
             
