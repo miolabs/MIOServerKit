@@ -30,6 +30,9 @@ public class MIOServerKit
         parse_command_line_arguments()
         settings = loadSettingsPlist(path: "\(serverPath)/App.plist")
         
+        let server_settings = loadSettingsPlist(path: "\(serverPath)/Server.plist")
+        settings = settings.merging( server_settings ) { (_, new) in new }
+        
         HeliumLogger.use(.info)
     }
     
