@@ -146,14 +146,13 @@ public protocol RouterContextProtocol {
         } else {
             let response_json = json is [Any] || json is [String: Any] ? [ "status" : ResponseStatus.ok.rawValue, "data" : json! ]
                               :                                          [ "status" : ResponseStatus.ok.rawValue ]
-            
             #if SAVE_RECORD
             if record_request {
                 g_request_recorder.append( RequestRecorded( self, response_json ) )
             }
             #endif
             
-            response.send(json: response_json )
+            response.send(json: MIOCoreSerializableJSON( response_json ) as! [String:Any] )
         }
         
         try response.end( )
