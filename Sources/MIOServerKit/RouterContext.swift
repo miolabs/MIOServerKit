@@ -57,7 +57,7 @@ public struct ResponseContext {
     }
     
     func asJson ( ) -> [String:Any] {
-        return [ "data": data
+        return [ "data": MIOCoreSerializableJSON( data )
                , "status": status
                , "error": error
                , "errorCode": errorCode ]
