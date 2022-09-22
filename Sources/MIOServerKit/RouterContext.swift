@@ -138,8 +138,8 @@ public protocol RouterContextProtocol {
         } else if let ret = json as? String {
             response.send( ret )
         } else {
-            let response_json = json is [Any] || json is [String: Any] ? ["status" : "OK", "data" : json! ]
-                              :                                          ["status" : "OK"]
+            let response_json = json is [Any] || json is [String: Any] ? ["status" : 0, "data" : json! ]
+                              :                                          ["status" : 0 ]
             
             #if SAVE_RECORD
             if record_request {
@@ -147,7 +147,7 @@ public protocol RouterContextProtocol {
             }
             #endif
             
-            response.send(json: response_json )
+            response.send(json: MIOCoreSerializableJSON( response_json ) as! [String:Any] )
         }
         
         try response.end( )
@@ -158,7 +158,7 @@ public protocol RouterContextProtocol {
         
         response.status( httpStatus )
         
-        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
+        let response_json: [String:Any] = ["status" : -1, "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
         
         #if SAVE_RECORD
         if record_request {
