@@ -71,6 +71,7 @@ open class MSKServer<T>: MSKRouter<T> {
             self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
         } else {
             // TODO: respond: page not found
+            response.status(.notFound)
             response.send( data: "NOT FOUND: \(method.rawValue) \(path)".data(using: .utf8)! )
         }
     }

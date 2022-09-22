@@ -30,6 +30,9 @@ public class MIOServerKit
         parse_command_line_arguments()
         settings = loadSettingsPlist(path: "\(serverPath)/App.plist")
         
+        let server_settings = loadSettingsPlist(path: "\(serverPath)/Server.plist")
+        settings = settings.merging( server_settings ) { (_, new) in new }
+        
         HeliumLogger.use(.info)
     }
     
@@ -48,10 +51,13 @@ public class MIOServerKit
             
     public func loadSettingsPlist(path:String) -> [String : Any]{
         
-        let xml = FileManager.default.contents(atPath: path)
+        guard let xml = FileManager.default.contents(atPath: path) else {
+            print("MIOServerKit: Path not found: \(path)")
+            return [:]
+        }
         
         do {
-            guard let items = try PropertyListSerialization.propertyList(from: xml!, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
+            guard let items = try PropertyListSerialization.propertyList(from: xml, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
                 return [:]
             }
             
@@ -81,6 +87,9 @@ public class MIOServerKit
         }
     }
     
+    public func settingValue(forKey key:String) -> Any? {
+        settings.keys.contains(key) ? settings[key]! : nil
+    }
     var settings:[String:Any] = [:]
     public var serverVersion:String {
         return settings.keys.contains("Version") ? settings["Version"] as! String : "UNKOWN"

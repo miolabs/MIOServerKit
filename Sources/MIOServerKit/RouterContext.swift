@@ -43,13 +43,19 @@ public func clean_recorded_test ( ) { g_request_recorder = [] }
 #endif
 
 
+public enum ResponseStatus: Int
+{
+    case ok    = 0
+    case error = -1
+}
+
 public struct ResponseContext {
     var data: Any
-    var status: String = "OK"
+    var status: ResponseStatus = .ok
     var error: String  = ""
     var errorCode: Int = 0
     
-    public init ( data: Any, status: String = "OK", error: String = "", errorCode: Int = 0 ) {
+    public init ( data: Any, status: ResponseStatus = .ok, error: String = "", errorCode: Int = 0 ) {
         self.data = data
         self.status = status
         self.error = error
@@ -58,7 +64,7 @@ public struct ResponseContext {
     
     func asJson ( ) -> [String:Any] {
         return [ "data": MIOCoreSerializableJSON( data )
-               , "status": status
+               , "status": status.rawValue
                , "error": error
                , "errorCode": errorCode ]
     }
@@ -138,16 +144,15 @@ public protocol RouterContextProtocol {
         } else if let ret = json as? String {
             response.send( ret )
         } else {
-            let response_json = json is [Any] || json is [String: Any] ? ["status" : "OK", "data" : json! ]
-                              :                                          ["status" : "OK"]
-            
+            let response_json = json is [Any] || json is [String: Any] ? [ "status" : ResponseStatus.ok.rawValue, "data" : json! ]
+                              :                                          [ "status" : ResponseStatus.ok.rawValue ]
             #if SAVE_RECORD
             if record_request {
                 g_request_recorder.append( RequestRecorded( self, response_json ) )
             }
             #endif
             
-            response.send(json: response_json )
+            response.send(json: MIOCoreSerializableJSON( response_json ) as! [String:Any] )
         }
         
         try response.end( )
@@ -158,7 +163,7 @@ public protocol RouterContextProtocol {
         
         response.status( httpStatus )
         
-        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
+        let response_json: [String:Any] = ["status" : ResponseStatus.error.rawValue, "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
         
         #if SAVE_RECORD
         if record_request {
