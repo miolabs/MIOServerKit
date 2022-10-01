@@ -64,7 +64,7 @@ public struct ResponseContext {
     
     func asJson ( ) -> [String:Any] {
         return [ "data": MIOCoreSerializableJSON( data )
-               , "status": status.rawValue
+               , "status": "OK"
                , "error": error
                , "errorCode": errorCode ]
     }
@@ -144,8 +144,8 @@ public protocol RouterContextProtocol {
         } else if let ret = json as? String {
             response.send( ret )
         } else {
-            let response_json = json is [Any] || json is [String: Any] ? [ "status" : ResponseStatus.ok.rawValue, "data" : json! ]
-                              :                                          [ "status" : ResponseStatus.ok.rawValue ]
+            let response_json = json is [Any] || json is [String: Any] ? [ "status" : "OK", "data" : json! ]
+                              :                                          [ "status" : "OK" ]
             #if SAVE_RECORD
             if record_request {
                 g_request_recorder.append( RequestRecorded( self, response_json ) )
@@ -163,7 +163,7 @@ public protocol RouterContextProtocol {
         
         response.status( httpStatus )
         
-        let response_json: [String:Any] = ["status" : ResponseStatus.error.rawValue, "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
+        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
         
         #if SAVE_RECORD
         if record_request {
