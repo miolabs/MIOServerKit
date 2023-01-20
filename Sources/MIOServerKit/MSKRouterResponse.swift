@@ -6,55 +6,61 @@
 //
 
 import Foundation
-import Kitura
+import NIOCore
+import NIOHTTP1
 
 open class MSKRouterResponse
 {
-    public var response:RouterResponse? = nil
+    var _status: HTTPResponseStatus = .ok
+    var _headers:HTTPHeaders = HTTPHeaders()
+    var _ctx: ChannelHandlerContext
+    var _data:Data? = nil
     
-    public init ( _ response:RouterResponse? = nil ){
-        self.response = response
+    public init ( context: ChannelHandlerContext ) {
+        _ctx = context
     }
     
     @discardableResult
-    public func status ( _ status:MSKHTTPStatusCode ) -> MSKRouterResponse {
-        response!.status(status)
+    public func status ( _ status: HTTPResponseStatus ) -> MSKRouterResponse {
+        _status = status
         return self
     }
     
     @discardableResult
     public func send ( data: Data ) -> MSKRouterResponse {
-        response!.send(data: data)
+        if _data == nil { _data = Data() }
+        _data?.append( data )
         return self
     }
     
     @discardableResult
-    public func send ( json:[Any] ) -> MSKRouterResponse {
-        response!.headers["Content-Type"] = "application/json"
-        response!.send(json: json)
+    public func send ( json:Any ) -> MSKRouterResponse {
+        _headers.add( name: "Content-Type", value: "application/json" )
+        var data:Data
+        do {
+            data = try JSONSerialization.data(withJSONObject: json )
+        }
+        catch {
+            data = error.localizedDescription.data(using: .utf8 )!
+        }
+        
+        send( data: data )
         return self
     }
     
-    @discardableResult
-    public func send ( json:[String:Any] ) -> MSKRouterResponse {
-        response!.headers["Content-Type"] = "application/json"
-        response!.send(json: json)
-        return self
-    }
-
     
     @discardableResult
-    public func send (_ data:String ) -> MSKRouterResponse {
-        response!.send( data )
+    public func send (_ text:String ) -> MSKRouterResponse {
+        send( data: text.data( using: .utf8 )! )
         return self
     }
 
     public func redirect ( _ path: String ) throws {
-        try response!.redirect( path )
+//        try response!.redirect( path )
     }
     
     public func end() throws {
-        try response!.end()
+//        try response!.end()
     }
     
 //    public func send(json: Encodable) -> MSKRouterResponse {

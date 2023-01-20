@@ -6,10 +6,9 @@
 //
 
 import Foundation
-import Kitura
-import KituraCORS
-
-public typealias MSKHTTPStatusCode = HTTPStatusCode
+//import Kitura
+//import KituraCORS
+import NIOHTTP1
 
 public typealias RequestDispatcher<T> = (T) throws -> Any
 
@@ -38,40 +37,40 @@ open class EndpointHooks<T>
 
 open class MSKServerRouter<T>
 {
-    public var router = Router()
+//    public var router = Router()
     
     public init() {
         
         // Setting up CORS
-        let options = Options(allowedOrigin: .all, methods: ["GET", "POST"], maxAge: 5)
-        let cors = CORS(options: options)
-
-        router.all(middleware: cors)
-        router.post(middleware: BodyParser())
-        router.put(middleware: BodyParser())
+//        let options = Options(allowedOrigin: .all, methods: ["GET", "POST"], maxAge: 5)
+//        let cors = CORS(options: options)
+//
+//        router.all(middleware: cors)
+//        router.post(middleware: BodyParser())
+//        router.put(middleware: BodyParser())
     }
     
     open func GET ( _ endpoint: String, _ fn: @escaping RequestDispatcher<T> ) {
-    router.get( endpoint, handler: request_dispatcher(fn) )
+//    router.get( endpoint, handler: request_dispatcher(fn) )
     //get( endpoint + "/:entity_id?", handler: request_dispatcher(fn) )
   }
 
   open func POST ( _ endpoint: String, _ fn: @escaping RequestDispatcher<T>) {
-    router.post( endpoint, handler: request_dispatcher(fn) )
+//    router.post( endpoint, handler: request_dispatcher(fn) )
   }
 
   open func PUT ( _ endpoint: String, _ fn: @escaping RequestDispatcher<T> ) {
-    router.put( endpoint, handler: request_dispatcher(fn) )
+//    router.put( endpoint, handler: request_dispatcher(fn) )
   }
 
   open func PATCH ( _ endpoint: String, _ fn: @escaping RequestDispatcher<T> ) {
     //patch( endpoint + "/:entity_id", handler: request_entity_dispatcher(fn) )
-    router.patch( endpoint, handler: request_dispatcher(fn) )
+//    router.patch( endpoint, handler: request_dispatcher(fn) )
   }
 
   open func DELETE ( _ endpoint: String, _ fn: @escaping RequestDispatcher<T> ) {
     //delete( endpoint + "/:entity_id", handler: request_entity_dispatcher(fn) )
-    router.delete( endpoint, handler: request_dispatcher(fn) )
+//    router.delete( endpoint, handler: request_dispatcher(fn) )
   }
 
   open func endpoint ( _ path: String, _ hooks: EndpointHooks<T> ) -> Void {
@@ -83,12 +82,14 @@ open class MSKServerRouter<T>
   }
 
   // if fn return nil, nothing will be done
-  open func request_dispatcher( _ fn: @escaping RequestDispatcher<T> ) -> RouterHandler {
-    
-    return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
-        try self.context_dispatcher( RouterContext( MSKRouterRequest( request ), MSKRouterResponse( response ) ), fn )
-    }
-  }
+
+    //TODO: Review this
+//open func request_dispatcher( _ fn: @escaping RequestDispatcher<T> ) -> RouterHandler {
+//
+//    return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
+//        try self.context_dispatcher( RouterContext( MSKRouterRequest( request ), MSKRouterResponse( response ) ), fn )
+//    }
+//  }
 
   // if fn return nil, nothing will be done
 //  public func request_entity_dispatcher( _ fn: @escaping RequestEntityDispatcher ) -> RouterHandler {
@@ -100,9 +101,10 @@ open class MSKServerRouter<T>
 //    }
 //  }
 
-    open func context_dispatcher( _ context:RouterContext, _ fn: @escaping RequestDispatcher<T> ) throws -> Void {
-        //try _context_dispatcher(context, fn)
-    }
+    //TODO: review this
+//    open func context_dispatcher( _ context:RouterContext, _ fn: @escaping RequestDispatcher<T> ) throws -> Void {
+//        //try _context_dispatcher(context, fn)
+//    }
         
 //    func _context_dispatcher( _ context:RouterContext, _ fn: @escaping RequestDispatcher<T> ) throws -> Void {
 //    //defer { context.disconnect( ) }
@@ -120,11 +122,12 @@ open class MSKServerRouter<T>
 //    }
 //  }
 
-    open func willDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
-    }
-    
-    open func didDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
-    }
+    //TODO: review
+//    open func willDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
+//    }
+//
+//    open func didDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
+//    }
 }
 
 

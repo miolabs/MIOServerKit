@@ -6,24 +6,24 @@
 //
 
 import Foundation
-import Kitura
+//import Kitura
 import MIOCore
+import NIOHTTP1
 
 public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
 public struct RequestRecorded {
-    public var method  : RouterMethod
+    public var method  : HTTPMethod
     public var url     : String
     public var body    : Any?
     public var response: [String:Any?]
     
-    public init ( _ context: RouterContext, _ res: [String:Any?] ) {
+    public init ( _ context: MSKRouterContext, _ res: [String:Any?] ) {
         method   = context.request.method
         url      = context.request.url.path
         body     = try? context.request.bodyAsJSON()
         response = res
     }
-    
     
     public func as_swift_code ( ) -> [Any?] {
         return [method.rawValue,url,body,response]
@@ -49,7 +49,8 @@ public enum ResponseStatus: Int
     case error = -1
 }
 
-public struct ResponseContext {
+public struct ResponseContext
+{
     var data: Any
     var status: ResponseStatus = .ok
     var error: String  = ""
@@ -78,7 +79,7 @@ public protocol RouterContextProtocol {
 }
 
 
-@objc open class RouterContext : MIOCoreContext, RouterContextProtocol
+@objc open class MSKRouterContext : MIOCoreContext, RouterContextProtocol
 {
     public var request: MSKRouterRequest
     public var response: MSKRouterResponse
@@ -88,10 +89,10 @@ public protocol RouterContextProtocol {
         self.response = response
     }
     
-    public init ( ) {
-        self.request = MSKRouterRequest( )
-        self.response = MSKRouterResponse( )
-    }
+//    public init ( ) {
+//        self.request = MSKRouterRequest( )
+//        self.response = MSKRouterResponse( )
+//    }
     
     open func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )
@@ -104,7 +105,7 @@ public protocol RouterContextProtocol {
     
     var _body_as_json: [String : Any]? = nil
     
-    var _body: [String:Any]? = nil
+    var _body: Any? = nil
     public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
         if _body == nil {
             let json = try? request.bodyAsJSON()
@@ -117,23 +118,29 @@ public protocol RouterContextProtocol {
             _body = json
         }
         
-        if !_body!.keys.contains(name) {
+        if let dict = _body as? [ String:Any ] {
+            
+            if dict.keys.contains(name) {
+                if optional { return nil }
+                throw MIOError.fieldNotFound( name )
+            }
+            
+            
+            if let value = dict[ name ] as? T {
+                return value
+            }
+            
             if optional { return nil }
+            
             throw MIOError.fieldNotFound( name )
         }
         
-        
-        if let value = _body![ name ] as? T {
-            return value
-        }
-
-        if optional { return nil }
         throw MIOError.fieldNotFound( name )
     }
 
     
     public func sendOKResponse ( _ json : Any? = nil ) throws {
-        response.status(.OK)
+        response.status( .ok )
         
         if json == nil {
             
@@ -159,7 +166,7 @@ public protocol RouterContextProtocol {
     }
     
     
-    public func sendErrorResponse ( _ error : Error, httpStatus : MSKHTTPStatusCode = .badRequest) throws {
+    public func sendErrorResponse ( _ error : Error, httpStatus : HTTPResponseStatus = .badRequest) throws {
         
         response.status( httpStatus )
         

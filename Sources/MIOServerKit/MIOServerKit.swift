@@ -1,8 +1,5 @@
 
 import Foundation
-import Kitura
-import HeliumLogger
-
 
 #if canImport(FoundationNetworking)
 import FoundationNetworking
@@ -10,6 +7,7 @@ import FoundationNetworking
 
 import ArgumentParser
 import MIOCore
+import NIOHTTP1
 
 public class MIOServerKit
 {
@@ -33,12 +31,12 @@ public class MIOServerKit
         let server_settings = loadSettingsPlist(path: "\(serverPath)/Server.plist")
         settings = settings.merging( server_settings ) { (_, new) in new }
         
-        HeliumLogger.use(.info)
+//        HeliumLogger.use(.info)
     }
     
     public func run (port:Int, router:MSKServerRouter<Any>) {
-        Kitura.addHTTPServer(onPort: port, with: router.router)
-        Kitura.run()
+//        Kitura.addHTTPServer(onPort: port, with: router.router)
+//        Kitura.run()
     }
     
     public func urlDataRequest(_ request:URLRequest) throws -> Data? {
@@ -101,7 +99,7 @@ extension MSKRouterResponse {
     // TODO: Used in auth server...
     public func sendOKResponse(json : Any? = nil) -> MSKRouterResponse {
 
-        self.status(.OK)
+        self.status( .ok )
         if json == nil {
             self.send(json: ["status" : "OK"])
         } else if json is [Any] || json is [String: Any] {
@@ -112,7 +110,7 @@ extension MSKRouterResponse {
     }
 
     // TODO: Used in redsys...
-    public func sendErrorResponse(_ error : Error, httpStatus : HTTPStatusCode = .badRequest) -> MSKRouterResponse {
+    public func sendErrorResponse(_ error : Error, httpStatus : HTTPResponseStatus = .badRequest ) -> MSKRouterResponse {
 
         self.status(httpStatus)
 
