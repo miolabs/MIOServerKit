@@ -10,7 +10,7 @@ import NIOPosix
 import NIOHTTP1
 //import NIOFoundationCompat
 
-final class MSKHTTPHandler: ChannelInboundHandler
+public class ServerHTTPHandler: ChannelInboundHandler
 {
     public typealias InboundIn = HTTPServerRequestPart
     public typealias OutboundOut = HTTPServerResponsePart
@@ -36,7 +36,8 @@ final class MSKHTTPHandler: ChannelInboundHandler
         }
     }
     
-    private var buffer: ByteBuffer! = nil
+    
+    private var buffer: ByteBuffer!
     private var keepAlive = false
     private var state = State.idle
     
@@ -44,16 +45,15 @@ final class MSKHTTPHandler: ChannelInboundHandler
     private var requestHead: HTTPRequestHead?
     private var bodyBytes: Int = 0
     
-    public init() {}
+    private var router: Router
     
+    public init( router: Router ) {
+        self.router = router
+    }
     
-    func channelRead(context: ChannelHandlerContext, data: NIOAny)
+    public func channelRead(context: ChannelHandlerContext, data: NIOAny)
     {
         let reqPart = self.unwrapInboundIn(data)
-        //        if let handler = self.handler {
-        //            handler(context, reqPart)
-        //            return
-        //        }
         
         switch reqPart {
         case .head(let request):
@@ -71,6 +71,8 @@ final class MSKHTTPHandler: ChannelInboundHandler
             self.state.requestComplete()
             let request = MSKRouterRequest( requestHead!, body: buffer )
             let response = MSKRouterResponse( context: context )
+            
+            dispatchRequest( request, response )
             
             let content = HTTPServerResponsePart.body( .byteBuffer( buffer!.slice() ) )
             context.write( self.wrapOutboundOut(content), promise: nil )
@@ -93,12 +95,12 @@ final class MSKHTTPHandler: ChannelInboundHandler
     }
 
     
-    func channelReadComplete(context: ChannelHandlerContext)
+    public func channelReadComplete(context: ChannelHandlerContext)
     {
         context.flush()
     }
     
-    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any)
+    public func userInboundEventTriggered(context: ChannelHandlerContext, event: Any)
     {
         switch event
         {
@@ -118,5 +120,27 @@ final class MSKHTTPHandler: ChannelInboundHandler
                 context.fireUserInboundEventTriggered(event)
         }
     }
+    
+    
+    public func dispatchRequest ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) {
+        let path = request.url.relativePath
+        var route_vars: RouterPathVars = [:]
+        let method = EndpointMethod( rawValue: request.method.rawValue )!        
+        
+        let endpoint = router.root.match( method
+                                 , RouterPath( path )
+                                 , &route_vars )
+        
+        if endpoint != nil {
+            request.parameters = route_vars
+            self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
+        } else {
+            // TODO: respond: page not found
+            response.status(.notFound)
+            response.send( data: "NOT FOUND: \(method.rawValue) \(path)".data(using: .utf8)! )
+        }
+    }
+    
+    open func process ( _ callback: EndpointRequestDispatcher, _ vars: RouterPathVars, _ request: MSKRouterRequest, _ response: MSKRouterResponse ) { }
     
 }

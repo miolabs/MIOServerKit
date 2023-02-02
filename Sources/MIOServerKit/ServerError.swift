@@ -7,14 +7,14 @@
 
 import Foundation
 
-public enum MIOError: Error
+public enum ServerError: Error
 {
     case fieldNotFound(_ description:String)
     case missingJSONBody( functionName: String = #function )
 }
 
 
-extension MIOError: LocalizedError {
+extension ServerError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case let .fieldNotFound( description ):

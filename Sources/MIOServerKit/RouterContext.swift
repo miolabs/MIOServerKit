@@ -12,13 +12,14 @@ import NIOHTTP1
 
 public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
-public struct RequestRecorded {
+public struct RequestRecorded
+{
     public var method  : HTTPMethod
     public var url     : String
     public var body    : Any?
     public var response: [String:Any?]
     
-    public init ( _ context: MSKRouterContext, _ res: [String:Any?] ) {
+    public init ( _ context: RouterContext, _ res: [String:Any?] ) {
         method   = context.request.method
         url      = context.request.url.path
         body     = try? context.request.bodyAsJSON()
@@ -79,7 +80,8 @@ public protocol RouterContextProtocol {
 }
 
 
-@objc open class MSKRouterContext : MIOCoreContext, RouterContextProtocol
+@objc
+open class RouterContext : MIOCoreContext, RouterContextProtocol
 {
     public var request: MSKRouterRequest
     public var response: MSKRouterResponse
@@ -112,7 +114,7 @@ public protocol RouterContextProtocol {
             
             if json == nil {
                 if optional { return nil }
-                throw MIOError.missingJSONBody( )
+                throw ServerError.missingJSONBody( )
             }
             
             _body = json
@@ -122,7 +124,7 @@ public protocol RouterContextProtocol {
             
             if dict.keys.contains(name) {
                 if optional { return nil }
-                throw MIOError.fieldNotFound( name )
+                throw ServerError.fieldNotFound( name )
             }
             
             
@@ -132,10 +134,10 @@ public protocol RouterContextProtocol {
             
             if optional { return nil }
             
-            throw MIOError.fieldNotFound( name )
+            throw ServerError.fieldNotFound( name )
         }
         
-        throw MIOError.fieldNotFound( name )
+        throw ServerError.fieldNotFound( name )
     }
 
     

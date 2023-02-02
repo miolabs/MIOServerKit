@@ -13,8 +13,8 @@ import NIOHTTP1
 
 public let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
-open class MSKServer<T>: MSKRouter<T> {
-
+public final class Server
+{
     // MARK: Initializer
     
     /// Initialize a `MIORouter` instance.
@@ -22,9 +22,23 @@ open class MSKServer<T>: MSKRouter<T> {
     /// ```swift
     ///  let router = MIORouter()
     /// ```
-    public override init() {        
-        super.init( )
+    ///
+    
+    let context_type: RouterContext.Type
+    let router:Router
 
+        
+    public init( router: Router? = nil ) {
+        context_type = RouterContext.self
+        self.router = router ?? Router()
+    }
+    
+    public init( router: Router? = nil, contextType: RouterContext.Type ) {
+        context_type = contextType
+        self.router = router ?? Router()
+    }
+
+    
 //        func dispatch ( ) -> RouterHandler {
 //          return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
 //              self.dispatchRequest( MSKRouterRequest( request ), MSKRouterResponse( response ) )
@@ -49,13 +63,14 @@ open class MSKServer<T>: MSKRouter<T> {
 
         
 //        Log.verbose("MSKRouter initialized")
-    }
+//    }
 
 
     deinit {
         try! group.syncShutdownGracefully()
     }
  
+    /*
     public func dispatchRequest ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) {
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
@@ -76,10 +91,11 @@ open class MSKServer<T>: MSKRouter<T> {
     }
 
     open func process ( _ callback: EndpoingRequestDispatcher<T>, _ vars: RouterPathVars, _ request: MSKRouterRequest, _ response: MSKRouterResponse ) { }
+    */
     
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
-            channel.pipeline.addHandler( MSKHTTPHandler() )
+            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router ) )
         }
     }
     
