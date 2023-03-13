@@ -93,7 +93,7 @@ open class ServerRouter<T>
 //open func request_dispatcher( _ fn: @escaping RequestDispatcher<T> ) -> RouterHandler {
 //
 //    return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
-//        try self.context_dispatcher( RouterContext( MSKRouterRequest( request ), MSKRouterResponse( response ) ), fn )
+//        try self.context_dispatcher( RouterContext( RouterRequest( request ), RouterResponse( response ) ), fn )
 //    }
 //  }
 >>>>>>> c63c849bacc0851be0dfcb401a5825219e90759f

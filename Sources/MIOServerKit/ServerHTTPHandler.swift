@@ -72,7 +72,8 @@ class ServerHTTPHandler: ChannelInboundHandler
         if endpoint != nil
         {
             request.parameters = route_vars
-            try self.process( endpoint!.methods[ method ]!.cb, route_vars, endpoint!.methods[ method ]!.contextType )
+            let endpoint_spec = endpoint!.methods[ method ] as! Endpoint.MethodEndpoint<Any>
+            try self.process( endpoint_spec.cb, route_vars, endpoint_spec.contextType( ) as! RouterContextProtocol.Type )
         }
         else
         {

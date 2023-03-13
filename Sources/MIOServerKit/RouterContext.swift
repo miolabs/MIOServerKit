@@ -86,8 +86,8 @@ public protocol RouterContextProtocol
     func bodyAsData() -> Data?
     func bodyAsJSON() -> Any?
     
-    var request: RouterRequest? { get set }
-    var response: RouterResponse? { get set }
+    var request: RouterRequest! { get set }
+    var response: RouterResponse! { get set }
     
     func willExectute() throws
     func didExecute() throws
@@ -96,8 +96,8 @@ public protocol RouterContextProtocol
 @objc
 open class RouterContext : MIOCoreContext, RouterContextProtocol
 {
-    public var request: RouterRequest?
-    public var response: RouterResponse?
+    public var request: RouterRequest!
+    public var response: RouterResponse!
 
     public init ( _ request: RouterRequest, _ response: RouterResponse ) {
         self.request  = request
@@ -105,25 +105,23 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     }
     
     public required init ( ) {
-//        self.request = RouterRequest( )
-//        self.response = RouterResponse( )
     }
-    
+
     open func urlParam<T> ( _ name: String ) throws -> T {
-        return try MIOCoreParam( request?.parameters ?? [:], name )
+        return try MIOCoreParam( request.parameters, name )
     }
     
     open func queryParam ( _ name: String ) -> String? {
-        return request?.queryParameters[ name ]
+        return request.queryParameters[ name ]
     }
     
     open func bodyAsData() -> Data? {
-        return request?.body
+        return request.body
     }
 
     open func bodyAsJSON() -> Any? {
-        if request?.body == nil { return nil }
-        return try? JSONSerialization.jsonObject( with: request!.body! )
+        if request.body == nil { return nil }
+        return try? JSONSerialization.jsonObject( with: request.body! )
     }
     
     var _body_as_json: [String : Any]? = nil
@@ -156,11 +154,10 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
             if optional { return nil }
             throw ServerError.fieldNotFound( name )
         }
-        
-        
-        if let value = _body![ name ] as? T {
-            return value
-        }
+                
+//        if let value = _body![ name ] as? T {
+//            return value
+//        }
 
         if optional { return nil }
         throw ServerError.fieldNotFound( name )

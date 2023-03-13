@@ -19,9 +19,20 @@ open class RouterRequest
         set { _parameters = newValue }
     }
 
+    public var userInfo: [String:Any] = [:]
     public var method:HTTPMethod { get { _http_request_head.method } }
     public var url:URL { get { _url } }
-    public var headers:HTTPHeaders { get { _http_request_head.headers } }
+    public var headers: [String:String] {
+        get {
+            var ret: [String:String] = [:]
+
+            for (key,value) in _http_request_head.headers {
+                ret[ key ] = value
+            }
+            
+            return ret
+        }
+    }
     public var queryParameters: [String:String] { get { _query_parameters } }
     public var body: Data? { get { _body } }
         

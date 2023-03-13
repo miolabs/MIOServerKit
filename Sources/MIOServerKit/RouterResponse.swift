@@ -63,7 +63,7 @@ open class RouterResponse
 //        try response!.end()
 //    }
     
-//    public func send(json: Encodable) -> MSKRouterResponse {
+//    public func send(json: Encodable) -> RouterResponse {
 //        response.send(json: json)
 //        return self
 //    }
