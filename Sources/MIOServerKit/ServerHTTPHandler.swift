@@ -27,12 +27,12 @@ class ServerHTTPHandler: ChannelInboundHandler
             precondition(self == .idle, "Invalid state for request received: \(self)")
             self = .waitingForRequestBody
         }
-        
+
         mutating func requestComplete() {
             precondition(self == .waitingForRequestBody, "Invalid state for request complete: \(self)")
             self = .sendingResponse
         }
-        
+
         mutating func responseComplete() {
             precondition(self == .sendingResponse, "Invalid state for response complete: \(self)")
             self = .idle
@@ -255,4 +255,5 @@ private func httpResponseHead(request: HTTPRequestHead, status: HTTPResponseStat
         }
     }
     return head
+
 }

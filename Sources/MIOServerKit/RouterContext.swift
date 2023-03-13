@@ -45,6 +45,7 @@ public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 //#endif
 //
 
+
 //public enum ResponseStatus: Int
 //{
 //    case ok    = 0
@@ -127,7 +128,7 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     
     var _body_as_json: [String : Any]? = nil
     
-    var _body: [String:Any]? = nil
+    var _body: Any? = nil
     public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
         if _body == nil {
             let json = bodyAsJSON() as? [String:Any]
@@ -140,7 +141,18 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
             _body = json
         }
         
-        if !_body!.keys.contains(name) {
+        if let dict = _body as? [ String:Any ] {
+            
+            if dict.keys.contains(name) {
+                if optional { return nil }
+                throw ServerError.fieldNotFound( name )
+            }
+            
+            
+            if let value = dict[ name ] as? T {
+                return value
+            }
+            
             if optional { return nil }
             throw ServerError.fieldNotFound( name )
         }
@@ -202,4 +214,5 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
 //
 //        try response.end( )
 //    }
+
 }

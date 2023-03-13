@@ -75,5 +75,4 @@ open class Server
             channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, docsPath: self.docsPath ) )
         }
     }
-
 }
