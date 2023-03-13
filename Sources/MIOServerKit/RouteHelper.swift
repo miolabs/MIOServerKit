@@ -3,13 +3,10 @@
 //  DLAPIServer
 //
 //  Created by David Trallero on 07/07/2020.
+//  Modified by Javier Segura on 12/03/23.
 //
 
 import Foundation
-import Kitura
-import KituraCORS
-
-public typealias MSKHTTPStatusCode = HTTPStatusCode
 
 public typealias RequestDispatcher<T> = (T) throws -> Any
 
@@ -35,20 +32,20 @@ open class EndpointHooks<T>
     }
 }
 
-
-open class MSKServerRouter<T>
+/*
+open class ServerRouter<T>
 {
     public var router = Router()
     
     public init() {
         
         // Setting up CORS
-        let options = Options(allowedOrigin: .all, methods: ["GET", "POST"], maxAge: 5)
-        let cors = CORS(options: options)
-
-        router.all(middleware: cors)
-        router.post(middleware: BodyParser())
-        router.put(middleware: BodyParser())
+//        let options = Options(allowedOrigin: .all, methods: ["GET", "POST"], maxAge: 5)
+//        let cors = CORS(options: options)
+//
+//        router.all(middleware: cors)
+//        router.post(middleware: BodyParser())
+//        router.put(middleware: BodyParser())
     }
     
     open func GET ( _ endpoint: String, _ fn: @escaping RequestDispatcher<T> ) {
@@ -86,7 +83,7 @@ open class MSKServerRouter<T>
   open func request_dispatcher( _ fn: @escaping RequestDispatcher<T> ) -> RouterHandler {
     
     return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
-        try self.context_dispatcher( RouterContext( MSKRouterRequest( request ), MSKRouterResponse( response ) ), fn )
+        try self.context_dispatcher( RouterContext( RouterRequest( request ), RouterResponse( response ) ), fn )
     }
   }
 
@@ -126,7 +123,7 @@ open class MSKServerRouter<T>
     open func didDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
     }
 }
-
+*/
 
 
 //public func response_not_found ( _ response: RouterResponse, _ entity: String, _ id: String ) {

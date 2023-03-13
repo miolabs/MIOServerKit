@@ -1,6 +1,5 @@
 
 import Foundation
-import Kitura
 import HeliumLogger
 
 
@@ -10,6 +9,7 @@ import FoundationNetworking
 
 import ArgumentParser
 import MIOCore
+import NIOHTTP1
 
 public class MIOServerKit
 {
@@ -36,10 +36,10 @@ public class MIOServerKit
         HeliumLogger.use(.info)
     }
     
-    public func run (port:Int, router:MSKServerRouter<Any>) {
-        Kitura.addHTTPServer(onPort: port, with: router.router)
-        Kitura.run()
-    }
+//    public func run (port:Int, router:MSKServerRouter<Any>) {
+//        Kitura.addHTTPServer(onPort: port, with: router.router)
+//        Kitura.run()
+//    }
     
     public func urlDataRequest(_ request:URLRequest) throws -> Data? {
         return try MIOCoreURLDataRequest_sync(request)
@@ -95,13 +95,13 @@ public class MIOServerKit
         return settings.keys.contains("Version") ? settings["Version"] as! String : "UNKOWN"
     }
 }
-
-extension MSKRouterResponse {
+/*
+extension RouterResponse {
 
     // TODO: Used in auth server...
-    public func sendOKResponse(json : Any? = nil) -> MSKRouterResponse {
+    public func sendOKResponse(json : Any? = nil) -> RouterResponse {
 
-        self.status(.OK)
+        self.status(.ok)
         if json == nil {
             self.send(json: ["status" : "OK"])
         } else if json is [Any] || json is [String: Any] {
@@ -112,7 +112,7 @@ extension MSKRouterResponse {
     }
 
     // TODO: Used in redsys...
-    public func sendErrorResponse(_ error : Error, httpStatus : HTTPStatusCode = .badRequest) -> MSKRouterResponse {
+    public func sendErrorResponse(_ error : Error, httpStatus : HTTPResponseStatus = .badRequest) -> RouterResponse {
 
         self.status(httpStatus)
 
@@ -123,3 +123,4 @@ extension MSKRouterResponse {
     }
     
 }
+*/
