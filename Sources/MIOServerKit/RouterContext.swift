@@ -104,7 +104,7 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         self.response = response
     }
     
-    public required init ( ) {
+    public override required init ( ) {
     }
 
     open func urlParam<T> ( _ name: String ) throws -> T {

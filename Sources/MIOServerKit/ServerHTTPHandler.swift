@@ -72,7 +72,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         if endpoint != nil
         {
             request.parameters = route_vars
-            let endpoint_spec = endpoint!.methods[ method ] as! Endpoint.MethodEndpoint<Any>
+            let endpoint_spec = endpoint!.methods[ method ] as! Endpoint.MethodEndpoint<MIOCoreContext>
             try self.process( endpoint_spec.cb, route_vars, endpoint_spec.contextType( ) as! RouterContextProtocol.Type )
         }
         else
@@ -83,7 +83,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
     }
 
-    open func process ( _ callback: EndpointRequestDispatcher<Any & RouterContextProtocol>, _ vars: RouterPathVars, _ contextType:RouterContextProtocol.Type ) throws {
+    open func process<T> ( _ callback: EndpointRequestDispatcher<T>, _ vars: RouterPathVars, _ contextType:RouterContextProtocol.Type ) throws {
         
         var ctx = contextType.init()
         ctx.request = request
@@ -91,7 +91,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         
         try ctx.willExectute()
         
-        let result = try callback( ctx )
+        let result = try callback( ctx as! T )
                 
         switch result {
         case let d as Data: self.buffer.writeData( d )

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import MIOCore
 
 public typealias RouterPathVars = [String:String]
 
@@ -526,7 +527,7 @@ public class Endpoint : EndpointTreeLeaf
         var super_vars: RouterPathVars = [:]
 
         if var ret = super.match( method, url, &super_vars ) {
-            let entry = methods[ method ] as! MethodEndpoint<Any>
+            let entry = methods[ method ] as! MethodEndpoint<MIOCoreContext>
             var extra_vars: RouterPathVars = [:]
 
             if entry.extra_url != nil {
