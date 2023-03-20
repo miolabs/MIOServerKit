@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import LoggerAPI
 
 import NIO
 import NIOHTTP1
@@ -18,7 +17,6 @@ public typealias http_mehod = HTTPMethod
 
 open class Server
 {
-
     var docsPath = "/dev/null"
     var router:Router
     
@@ -31,7 +29,7 @@ open class Server
     /// ```
     public init( routes: Router ) {
         self.router = routes
-        Log.verbose("Router initialized")
+        print("Router initialized")
     }
     
     deinit {
