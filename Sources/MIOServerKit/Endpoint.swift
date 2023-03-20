@@ -498,8 +498,7 @@ public class Endpoint : EndpointTreeLeaf
     }
     
 //    public var methods: [ EndpointMethod: (cb: EndpointRequestDispatcher<Any>, extra_url: RouterPath?, contextType: Any) ] = [:]
-    public var methods: [ EndpointMethod: Any ] = [:]
-    
+	    
     @discardableResult
     public func get<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .GET   , cb, url ) }
 
