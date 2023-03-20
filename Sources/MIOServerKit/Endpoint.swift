@@ -503,11 +503,11 @@ public class Endpoint : EndpointTreeLeaf
     @discardableResult
     public func get<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .GET   , cb, url ) }
 
-//    @discardableResult
-//    public func post   ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .POST  , cb, url ) }
+    @discardableResult
+    public func post<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .POST  , cb, url ) }
     
     @discardableResult
-    public func put( _ cb: @escaping EndpointRequestDispatcher<Any>, urlString: String? = nil ) -> Endpoint { return add_method( .PUT   , cb, urlString ) }
+    public func put<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, urlString: String? = nil ) -> Endpoint { return add_method( .PUT   , cb, urlString ) }
     
 //    @discardableResult
 //    public func patch  ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .PATCH , cb, url ) }
