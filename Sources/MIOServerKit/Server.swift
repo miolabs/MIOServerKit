@@ -18,7 +18,7 @@ public typealias http_mehod = HTTPMethod
 open class Server
 {
     var docsPath = "/dev/null"
-    var router:Router
+    var routers: Array<RouterProtocol>
     
     // MARK: Initializer
     
@@ -27,8 +27,8 @@ open class Server
     /// ```swift
     ///  let router = MIORouter()
     /// ```
-    public init( routes: Router ) {
-        self.router = routes
+    public init( routes: RouterProtocol ) {
+        self.routers = [ routes ]
         print("Router initialized")
     }
     
@@ -73,7 +73,7 @@ open class Server
     
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
-            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, docsPath: self.docsPath ) )
+            channel.pipeline.addHandler( ServerHTTPHandler( routers: self.routers, docsPath: self.docsPath ) )
         }
     }
 }

@@ -206,7 +206,7 @@ public class EndpointTreeLeaf
 }
 
 
-public class EndpointTreeNode
+public class EndpointTreeNode<T>
 {
     var value: EndpointTreeLeaf?
     var nodes: [String:EndpointTreeNode] = [:]
@@ -398,7 +398,7 @@ public class EndpointTreeNode
     }
 
     
-    func match ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint?
+    func match ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint<T>?
     {
         if value == nil {
             return match_subnode( method, route, &vars )
@@ -422,7 +422,7 @@ public class EndpointTreeNode
     }
     
     
-    func match_subnode ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint? {
+    func match_subnode ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint<T>? {
         if route.is_empty() {
             return null_node?.match( method, route, &vars )
         }
@@ -479,16 +479,16 @@ public class EndpointTreeNode
 }
 
 
-public typealias EndpointRequestDispatcher<RouterContextProtocol> = ( _ context: RouterContextProtocol ) throws -> Any?
+public typealias MethodDispatcher<RouterContextProtocol> = ( _ context: RouterContextProtocol ) throws -> Optional<Any>
 
-public class Endpoint : EndpointTreeLeaf
+public class Endpoint<T> : EndpointTreeLeaf
 {
-    public struct MethodEndpoint<T>
+    public struct EndpointMethodDispatcher<T>
     {
-        var cb: EndpointRequestDispatcher<T>
+        var cb: MethodDispatcher<T>
         var extra_url: RouterPath?
         
-        init(cb: @escaping ( _ context: T) throws -> Any?, extra_url: RouterPath? = nil ) {
+        init(cb: @escaping MethodDispatcher<T>, extra_url: RouterPath? = nil ) {
             self.cb = cb
             self.extra_url = extra_url
         }
@@ -499,15 +499,16 @@ public class Endpoint : EndpointTreeLeaf
     }
     
 //    public var methods: [ EndpointMethod: (cb: EndpointRequestDispatcher<Any>, extra_url: RouterPath?, contextType: Any) ] = [:]
-	    
-    @discardableResult
-    public func get<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .GET   , cb, url ) }
-
-    @discardableResult
-    public func post<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .POST  , cb, url ) }
+    public var methods: [ EndpointMethod: EndpointMethodDispatcher<T> ] = [:]
     
     @discardableResult
-    public func put<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, urlString: String? = nil ) -> Endpoint { return add_method( .PUT   , cb, urlString ) }
+    public func get ( _ cb: @escaping MethodDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .GET   , cb, url ) }
+
+    @discardableResult
+    public func post ( _ cb: @escaping MethodDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .POST  , cb, url ) }
+    
+    @discardableResult
+    public func put ( _ cb: @escaping MethodDispatcher<T>, urlString: String? = nil ) -> Endpoint { return add_method( .PUT   , cb, urlString ) }
     
 //    @discardableResult
 //    public func patch  ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .PATCH , cb, url ) }
@@ -515,8 +516,8 @@ public class Endpoint : EndpointTreeLeaf
 //    @discardableResult
 //    public func delete ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .DELETE, cb, url ) }
     
-    func add_method<T> ( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
-        methods[ method ] = MethodEndpoint(cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
+    func add_method ( _ method: EndpointMethod, _ cb: @escaping MethodDispatcher<T>, _ url: String? ) -> Endpoint {
+        methods[ method ] = EndpointMethodDispatcher(cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
         return self
     }
 
@@ -526,12 +527,12 @@ public class Endpoint : EndpointTreeLeaf
         var super_vars: RouterPathVars = [:]
 
         if var ret = super.match( method, url, &super_vars ) {
-            let entry = methods[ method ] as! MethodEndpoint<MIOCoreContext>
             var extra_vars: RouterPathVars = [:]
+            let endpoint_method = methods[ method ]!
 
-            if entry.extra_url != nil {
+            if endpoint_method.extra_url != nil {
                 if !ret.right.is_empty() {
-                    if let extra_ret = entry.extra_url!.match( ret.right, &extra_vars ) {
+                    if let extra_ret = endpoint_method.extra_url!.match( ret.right, &extra_vars ) {
                         ret.common.join( extra_ret.common )
                         ret.right = extra_ret.right
                     } else {
@@ -541,7 +542,7 @@ public class Endpoint : EndpointTreeLeaf
                     return nil
                 }
             }
-
+            
             vars.merge( super_vars ){ (old,new) in new }
             vars.merge( extra_vars ){ (old,new) in new }
 
@@ -552,15 +553,33 @@ public class Endpoint : EndpointTreeLeaf
     }
     
     
+//    func check_extra_var ( _ entry: EndpointMethodDispatcher<T>, _ ret: inout RouterPathDiff, _ extra_vars: inout RouterPathVars ) -> Bool {
+//        if entry.extra_url != nil {
+//            if !ret.right.is_empty() {
+//                if let extra_ret = entry.extra_url!.match( ret.right, &extra_vars ) {
+//                    ret.common.join( extra_ret.common )
+//                    ret.right = extra_ret.right
+//                } else {
+//                    return true
+//                }
+//            } else {
+//                return true
+//            }
+//        }
+//
+//        return false
+//    }
+    
+    
     public override func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
         super.debug_info( spaces, prefix )
         
         for (key, value ) in methods {
-            let str = "\(key.rawValue) \((value as! MethodEndpoint<Any>).extra_url?.debug_path() ?? "")"
+            let str = "\(key.rawValue) \(value.extra_url?.debug_path() ?? "")"
             print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str)
         }
     }
 }
 
 
-public class EndpointTree : EndpointTreeNode { }
+public class EndpointTree<T> : EndpointTreeNode<T> { }

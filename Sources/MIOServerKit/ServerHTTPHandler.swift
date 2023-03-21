@@ -53,62 +53,88 @@ class ServerHTTPHandler: ChannelInboundHandler
     var response:RouterResponse!
     
     private let docsPath: String
-    private let router: Router
-    
-    public init( router:Router, docsPath: String ) {
-        self.router = router
+    private let routers: Array<RouterProtocol>
+
+    public init( routers:Array<RouterProtocol>, docsPath: String ) {
+        self.routers = routers
         self.docsPath = docsPath
     }
     
     public func dispatchRequest ( ) throws {
         let path = request.url.relativePath
-        var route_vars: RouterPathVars = [:]
+//        var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request!.method.rawValue )!
+        let router_path = RouterPath( path )
 
-        let endpoint = router.root.match( method
-                                 , RouterPath( path )
-                                 , &route_vars )
+        for router in self.routers {
+            if try router.dispatch( method, router_path, &request, &response, send_response ) {
+                return
+            }
+        }
+//        let endpoint = router.root.match( method
+//                                 ,
+//                                 , &route_vars )
+//
+//        if endpoint != nil
+//        {
+//            request.parameters = route_vars
+//            try self.process( endpoint!.methods[ method ], route_vars )
+//        }
+//        else
+//        {
+//            // TODO: respond: page not found
+//            response.status(.notFound)
+//            self.buffer.writeString( "NOT FOUND: \(method.rawValue) \(path)" )
+//        }
 
-        if endpoint != nil
-        {
-            request.parameters = route_vars
-            let endpoint_spec = endpoint!.methods[ method ] as! Endpoint.MethodEndpoint<MIOCoreContext>
-            try self.process( endpoint_spec.cb, route_vars, endpoint_spec.contextType( ) as! RouterContextProtocol.Type )
-        }
-        else
-        {
-            // TODO: respond: page not found
-            response.status(.notFound)
-            response.body = "NOT FOUND: \(method.rawValue) \(path)"
-        }
+        self.buffer.writeString( "NOT FOUND: \(method.rawValue) \(path)" )
+
     }
 
-    open func process<T> ( _ callback: EndpointRequestDispatcher<T>, _ vars: RouterPathVars, _ contextType:RouterContextProtocol.Type ) throws {
-        
-        var ctx = contextType.init()
-        ctx.request = request
-        ctx.response = response
-        
-        try ctx.willExectute()
-        
-        let result = try callback( ctx as! T )
-                
+    func send_response ( _ result: Any? ) throws {
         switch result {
-        case let d as Data: self.buffer.writeData( d )
-        case let s as String: self.buffer.writeString( s )
-        case let arr as [Any]:
-            response.headers["Content-Type"] = "application/json"
-            let data = try MIOCoreJsonValue(withJSONObject: arr)
-            self.buffer.writeData( data )
-        case let dic as [String:Any]:
-            response.headers["Content-Type"] = "application/json"
-            let data = try MIOCoreJsonValue(withJSONObject: dic)
-            self.buffer.writeData( data )
-        default:break
+            case let d as Data: self.buffer.writeData( d )
+            case let s as String: self.buffer.writeString( s )
+            case let arr as [Any]:
+                response.headers["Content-Type"] = "application/json"
+                let data = try MIOCoreJsonValue(withJSONObject: arr)
+                self.buffer.writeData( data )
+            case let dic as [String:Any]:
+                response.headers["Content-Type"] = "application/json"
+                let data = try MIOCoreJsonValue(withJSONObject: dic)
+                self.buffer.writeData( data )
+            default:break
         }
-        
-        try ctx.didExecute()
     }
+
+    
+//    open func process<T> ( _ endpoint_spec: Endpoint.EndpointMethodDispatcher<T>, _ vars: RouterPathVars ) throws {
+//        // , endpoint_spec.contextType( ) as! RouterContextProtocol.Type
+//        var ctx = (endpoint_spec.contextType( ) as! RouterContextProtocol.Type).init()
+//        ctx.request = request
+//        ctx.response = response
+//
+//        try ctx.willExectute()
+//
+//        let result = try endpoint_spec.cb( ctx as! T )
+//
+//
+//        switch result {
+//        case let d as Data: self.buffer.writeData( d )
+//        case let s as String: self.buffer.writeString( s )
+//        case let arr as [Any]:
+//            response.headers["Content-Type"] = "application/json"
+//            let data = try MIOCoreJsonValue(withJSONObject: arr)
+//            self.buffer.writeData( data )
+//        case let dic as [String:Any]:
+//            response.headers["Content-Type"] = "application/json"
+//            let data = try MIOCoreJsonValue(withJSONObject: dic)
+//            self.buffer.writeData( data )
+//        default:break
+//        }
+//
+//        try ctx.didExecute()
+//    }
            
     private func completeResponse(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {
         self.state.responseComplete()

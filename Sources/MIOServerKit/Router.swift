@@ -7,22 +7,36 @@
 //
 
 import Foundation
+// import NIO
+import NIOHTTP1
 
-open class Router
+
+public typealias DispatchResponse = ( status: HTTPResponseStatus, response: Any )
+
+public protocol RouterProtocol {
+    func dispatch ( _ method: EndpointMethod
+                  , _ path: RouterPath
+                  , _ request: inout RouterRequest
+                  , _ response: inout RouterResponse
+                  , _ onSuccess: @escaping ( _ res: Any? ) throws -> Void
+                  ) throws -> Bool
+}
+
+open class Router<T: RouterContextProtocol>: RouterProtocol
 {
-    public  var root: EndpointTreeNode
+    public  var root: EndpointTreeNode<T>
 
     public init ( ) {
         root = EndpointTree( )
     }
     
-    public func endpoint ( _ url: String ) -> Endpoint
+    public func endpoint ( _ url: String ) -> Endpoint<T>
     {
         // We have to unify concepts:
         // hook/ is hook as that is the convention URL uses
         // let relativeUrl = url.count > 1 && url.last == "/" ? String(url.dropLast()) : url
         
-        let newEndpoint = Endpoint( url )
+        let newEndpoint = Endpoint<T>( url )
         
         root.insert( newEndpoint )
         
@@ -59,5 +73,41 @@ open class Router
         
         return ret
     }
+    
+    public func dispatch ( _ method: EndpointMethod
+                         , _ path: RouterPath
+                         , _ request: inout RouterRequest
+                         , _ response: inout RouterResponse
+                         , _ onSuccess: @escaping ( _ res: Any? ) throws -> Void
+                         ) throws -> Bool {
+        var route_vars: RouterPathVars = [:]
+        
+        let endpoint = root.match( method, path, &route_vars )
+
+        if endpoint != nil
+        {
+            request.parameters = route_vars
+ 
+            var ctx = T.init()
+            ctx.request = request
+            ctx.response = response
+                
+            try ctx.willExectute()
+                
+            let result = try endpoint!.methods[ method ]!.cb( ctx )
+            
+            try onSuccess( result )
+            
+            try ctx.didExecute()
+
+            return true
+        }
+        
+        return false
+//        else {
+//            return (status: .notFound, response: "NOT FOUND: \(method.rawValue) \(path)" )
+//        }
+    }
+
 }
 
