@@ -83,7 +83,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
     }
 
-    open func process ( _ callback: EndpointRequestDispatcher, _ vars: RouterPathVars, _ context_type:RouterContextProtocol.Type ) throws {
+    open func process( _ callback: EndpointRequestDispatcher, _ vars: RouterPathVars, _ context_type:RouterContextProtocol.Type ) throws {
         
         var ctx = context_type.init()
         ctx.request = request

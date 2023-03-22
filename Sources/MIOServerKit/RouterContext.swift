@@ -75,7 +75,7 @@ public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 //}
 
 
-public protocol RouterContextProtocol
+public protocol RouterContextProtocol : AnyObject
 {
     init()
     

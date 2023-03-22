@@ -502,16 +502,16 @@ public class Endpoint : EndpointTreeLeaf
         
     @discardableResult
     public func get( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil,_ ct: RouterContextProtocol.Type = RouterContext.self ) -> Endpoint {
-        return add_method( .GET  , cb, url, ct )
+        return addMethod( .GET  , cb, url, ct )
     }
 
     @discardableResult
-    public func post( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil, _ ct: RouterContextProtocol.Type ) -> Endpoint { return add_method( .POST  , cb, url, ct )
+    public func post( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil, _ ct: RouterContextProtocol.Type ) -> Endpoint { return addMethod( .POST  , cb, url, ct )
     }
     
     @discardableResult
-    public func put ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil, contextType ct: RouterContextProtocol.Type ) -> Endpoint {
-        return add_method( .PUT, cb, url, ct )
+    public func put<T:RouterContextProtocol> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil, contextType ct: T.Type ) -> Endpoint {
+        return addMethod( .PUT, cb, url, ct )
     }
     
 //    @discardableResult
@@ -520,7 +520,7 @@ public class Endpoint : EndpointTreeLeaf
 //    @discardableResult
 //    public func delete ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .DELETE, cb, url ) }
     
-    func add_method( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher, _ url: String?, _ ct: RouterContextProtocol.Type) -> Endpoint {
+    public func addMethod( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher, _ url: String?, _ ct: RouterContextProtocol.Type) -> Endpoint {
         methods[ method ] = (cb: cb, extra_url: url != nil ? RouterPath( url! ): nil, ct: ct )
         return self
     }
