@@ -73,7 +73,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         {
             request.parameters = route_vars
             let endpoint_spec = endpoint!.methods[ method ]!
-            try self.process( endpoint_spec.cb, route_vars, endpoint_spec.ct )
+            try self.process( endpoint_spec.cb, route_vars, endpoint_spec.ct as! any RouterContextProtocol.Type )
         }
         else
         {
@@ -83,9 +83,9 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
     }
 
-    open func process( _ callback: EndpointRequestDispatcher, _ vars: RouterPathVars, _ context_type:RouterContextProtocol.Type ) throws {
+    open func process( _ callback: EndpointRequestDispatcher, _ vars: RouterPathVars, _ context_type:any RouterContextProtocol.Type ) throws {
         
-        var ctx = context_type.init()
+        let ctx = context_type.init()
         ctx.request = request
         ctx.response = response
         
