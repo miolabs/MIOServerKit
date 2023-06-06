@@ -80,6 +80,7 @@ open class MSKServer<T>: MSKRouter<T> {
     
     public func run ( port:Int ) {
         Kitura.addHTTPServer( onPort: port, with: kituraRouter )
+//        server.options = ServerOptions(requestSizeLimit: nil, connectionLimit: nil)
         Kitura.run( )
     }
 }
