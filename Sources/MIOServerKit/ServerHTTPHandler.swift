@@ -73,7 +73,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         {
             request.parameters = route_vars
             let endpoint_spec = endpoint!.methods[ method ]!
-            try self.process( endpoint_spec.cb, route_vars, endpoint_spec.ct as! any RouterContextProtocol.Type )
+            try self.process( endpoint_spec, route_vars )
         }
         else
         {
@@ -83,31 +83,25 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
     }
 
-    open func process( _ callback: EndpointRequestDispatcher, _ vars: RouterPathVars, _ context_type:any RouterContextProtocol.Type ) throws {
-        
-        let ctx = context_type.init()
-        ctx.request = request
-        ctx.response = response
-        
-        try ctx.willExectute()
-        
-        let result = try callback( ctx )
-                
-        switch result {
-        case let d as Data: self.buffer.writeData( d )
-        case let s as String: self.buffer.writeString( s )
-        case let arr as [Any]:
-            response.headers["Content-Type"] = "application/json"
-            let data = try MIOCoreJsonValue(withJSONObject: arr)
-            self.buffer.writeData( data )
-        case let dic as [String:Any]:
-            response.headers["Content-Type"] = "application/json"
-            let data = try MIOCoreJsonValue(withJSONObject: dic)
-            self.buffer.writeData( data )
-        default:break
+    open func process( _ endpoint_spec: MethodEndpoint, _ vars: RouterPathVars ) throws {
+
+        try endpoint_spec.run( request, response) { result in
+            
+            switch result {
+            case let d as Data: self.buffer.writeData( d )
+            case let s as String: self.buffer.writeString( s )
+            case let arr as [Any]:
+                self.response.headers["Content-Type"] = "application/json"
+                let data = try MIOCoreJsonValue(withJSONObject: arr)
+                self.buffer.writeData( data )
+            case let dic as [String:Any]:
+                self.response.headers["Content-Type"] = "application/json"
+                let data = try MIOCoreJsonValue(withJSONObject: dic)
+                self.buffer.writeData( data )
+            default:break
+            }
         }
         
-        try ctx.didExecute()
     }
            
     private func completeResponse(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {

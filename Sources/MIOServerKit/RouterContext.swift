@@ -104,8 +104,7 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         self.response = response
     }
     
-    public override required init ( ) {
-    }
+    public override required init ( ) {}
 
     open func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )
@@ -165,7 +164,7 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     
     
     open func willExectute() throws { }
-    open func didExecute() throws { }
+    open func didExecute() throws { }    
 
     
 //    public func sendOKResponse ( _ json : Any? = nil ) throws {
