@@ -161,7 +161,11 @@ public class RouterPath
     public func join ( _ extra: RouterPath ) {
         parts.append(contentsOf: extra.parts )
     }
-    
+
+    public func joining ( _ extra: RouterPath ) -> RouterPath {
+        return RouterPath( from: parts + extra.parts )
+    }
+
     func debug_path ( ) -> String {
         return parts.count == 0 ? "/"
              : parts.map{ $0.name }.joined(separator: "/")
@@ -180,7 +184,7 @@ public enum EndpointMethod: String
 
 public class EndpointTreeLeaf
 {
-    var path: RouterPath
+    public var path: RouterPath
 
     public init ( _ url: String = "" ) {
         path = RouterPath( url )
@@ -376,7 +380,7 @@ public class EndpointTreeNode
             
             let diff = value!.diff( route )
 
-            if diff.common.is_empty() {
+            if diff.common.is_empty() && !value!.path.is_empty() {
                 return nil
             } else {
                 if diff.right.is_empty() && diff.left.is_empty() {
@@ -477,7 +481,7 @@ public class EndpointTreeNode
         }
         
         for (key,n) in nodes {
-            n.debug_info( spaces + 2, key + "/" )
+            n.debug_info( spaces + 2, key )
         }
         
         for n in var_nodes {

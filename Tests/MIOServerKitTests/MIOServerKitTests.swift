@@ -217,4 +217,17 @@ final class MIOServerKitTests: XCTestCase {
         XCTAssertTrue( tree.match( .GET, RouterPath( "/"              ), &route_vars ) === route_home )
         XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
         XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
-    }}
+    }
+
+    func testInsertRoutesAsSubRoutes() {
+
+        let router = Router( )
+        let root = router.router( "/file" )
+        
+        root.endpoint( "/version" ).get( nop )
+        router.root.debug_info()
+        
+        let node = router.root.find( RouterPath( "/file/version" ) )
+        XCTAssert( node != nil )
+    }
+}
