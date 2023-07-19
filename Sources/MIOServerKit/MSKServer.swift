@@ -31,7 +31,7 @@ open class MSKServer<T>: MSKRouter<T> {
 
         func dispatch ( ) -> RouterHandler {
           return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
-              self.dispatchRequest( MSKRouterRequest( request ), MSKRouterResponse( response ) )
+              try self.dispatchRequest( MSKRouterRequest( request ), MSKRouterResponse( response ) )
           }
         }
 
@@ -57,7 +57,7 @@ open class MSKServer<T>: MSKRouter<T> {
 
 
  
-    public func dispatchRequest ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) {
+    public func dispatchRequest ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) throws {
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request.method.rawValue )!
@@ -68,7 +68,7 @@ open class MSKServer<T>: MSKRouter<T> {
         
         if endpoint != nil {
             request.parameters = route_vars
-            self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
+            try self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
         } else {
             // TODO: respond: page not found
             response.status(.notFound)
@@ -76,7 +76,7 @@ open class MSKServer<T>: MSKRouter<T> {
         }
     }
 
-    open func process ( _ callback: EndpoingRequestDispatcher<T>, _ vars: RouterPathVars, _ request: MSKRouterRequest, _ response: MSKRouterResponse ) { }
+    open func process ( _ callback: EndpoingRequestDispatcher<T>, _ vars: RouterPathVars, _ request: MSKRouterRequest, _ response: MSKRouterResponse ) throws { }
     
     public func run ( port:Int ) {
         Kitura.addHTTPServer( onPort: port, with: kituraRouter )
