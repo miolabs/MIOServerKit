@@ -422,15 +422,16 @@ public class EndpointTreeNode<T> {
         let key = route.index_part()
         
         if nodes.keys.contains( key ) {
-            return nodes[ key ]!.match( method, route.drop_first( ), &vars )
-        } else {
-            for vnode in var_nodes {
-                var leaf_vars: RouterPathVars = [:]
-                
-                if let leaf = vnode.match( method, route, &leaf_vars ) {
-                    vars.merge( leaf_vars ){ (old,new) in new }
-                    return leaf
-                }
+            let ret = nodes[ key ]!.match( method, route.drop_first( ), &vars )
+            if ret != nil { return ret }
+        }
+
+        for vnode in var_nodes {
+            var leaf_vars: RouterPathVars = [:]
+            
+            if let leaf = vnode.match( method, route, &leaf_vars ) {
+                vars.merge( leaf_vars ){ (old,new) in new }
+                return leaf
             }
         }
         
