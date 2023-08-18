@@ -36,7 +36,7 @@ open class MSKServer<T>: MSKRouter<T> {
         }
 
         // Setting up CORS
-        let options = Options(allowedOrigin: .all, methods: ["GET", "POST"], maxAge: 5)
+        let options = Options(allowedOrigin: .all, methods: ["GET", "POST", "PUT", "PATCH"], maxAge: 5)
         let cors = CORS(options: options)
 
         kituraRouter.all(middleware: cors)
