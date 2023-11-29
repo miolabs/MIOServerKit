@@ -88,7 +88,7 @@ public protocol RouterContextProtocol {
         self.response = response
     }
     
-    public override init ( ) {
+    public init ( ) {
         self.request = MSKRouterRequest( )
         self.response = MSKRouterResponse( )
     }
