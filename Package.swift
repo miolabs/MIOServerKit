@@ -26,7 +26,14 @@ let package = Package(
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
         .target(
             name: "MIOServerKit",
-            dependencies: [.product(name: "ArgumentParser", package: "swift-argument-parser"), "Kitura",  "HeliumLogger", "KituraCORS", "MIOCore", // "MIOCoreData", "MIODB", "MIOPersistentStore"
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                "Kitura",
+                "HeliumLogger",
+                "KituraCORS",
+                "MIOCore",
+                .product(name: "MIOCoreContext", package: "MIOCore"),
+                // "MIOCoreData", "MIODB", "MIOPersistentStore"
             ]),
         .testTarget(
             name: "MIOServerKitTests",
