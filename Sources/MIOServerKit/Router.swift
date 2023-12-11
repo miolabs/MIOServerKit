@@ -10,7 +10,7 @@ import Foundation
 
 open class Router
 {
-    public  var root: EndpointTreeNode
+    public  var root: EndpointTreeNode!
 
     public init ( ) {
         root = EndpointTree( )
@@ -21,8 +21,8 @@ open class Router
         // We have to unify concepts:
         // hook/ is hook as that is the convention URL uses
         // let relativeUrl = url.count > 1 && url.last == "/" ? String(url.dropLast()) : url
-        
-        let newEndpoint = Endpoint( url )
+        let abs_path = root.value!.path.joining( RouterPath( url ) )
+        let newEndpoint = Endpoint( abs_path )
         
         root.insert( newEndpoint )
         
@@ -30,9 +30,11 @@ open class Router
     }
 
     public func router ( _ url: String ) -> Router {
-        if let node = root.find( RouterPath( url ) ) {
-            let ret = Router( )
-            ret.root = node
+        let path = RouterPath( url )
+        var node = root.find( path )
+        
+//            let ret = Router( )
+//            ret.root = node
 
 //            for n in node.nodes {
 //                if let empty_node = n as? EndpointTreeNode {
@@ -49,13 +51,18 @@ open class Router
 //            node.insert(empty_node)
 //            ret.root = empty_node
             
-            return ret
+//            return ret
+//        }
+
+        if node == nil {
+            root.insert( EndpointTreeLeaf( url ) )
+            node = root.find( path )
+            return self
         }
         
         let ret = Router( )
-        
-        root.insert( EndpointTreeLeaf( url ) )
-        ret.root = root.find( RouterPath( url ) )!
+        ret.root.value = EndpointTreeLeaf( )
+        node!.insert_subnode( ret.root )
         
         return ret
     }
