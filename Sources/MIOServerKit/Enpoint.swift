@@ -497,19 +497,14 @@ public class EndpointTreeNode
 
 public typealias EndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) throws -> Any?
 
-class A
-{
-    
-}
-
-protocol MethodEndpointWrapper
+protocol MethodEndpointExecutionProtocol
 {
     func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
 }
 
 public struct MethodEndpoint
 {
-    struct SubBox<T : RouterContext > : MethodEndpointWrapper
+    struct EndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
     {
         var cb: EndpointRequestDispatcher<T>
         
@@ -517,25 +512,22 @@ public struct MethodEndpoint
             self.cb = cb
         }
         
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping ( Any? ) throws -> Void ) throws
         {
-            let ctx = T.init()
-            ctx.request = request
-            ctx.response = response
-            
+            let ctx = try T.init( request, response )
             try ctx.willExectute()
             let result = try cb( ctx )
             try completion( result )
             try ctx.didExecute()
         }
     }
-
     
-    var wrapper: any MethodEndpointWrapper
+    var wrapper: any MethodEndpointExecutionProtocol
     var extra_url: RouterPath?
 
-    init <T:RouterContext>(cb: @escaping ( _ context: T) throws -> Any?, extra_url: RouterPath? = nil ) {
-        wrapper = SubBox( cb )
+    init <T:RouterContext>(cb: @escaping ( _ context: T ) throws -> Any?, extra_url: RouterPath? = nil )
+    {
+        wrapper = EndpointWrapper( cb )
         self.extra_url = extra_url
     }
     
@@ -557,23 +549,28 @@ public class Endpoint : EndpointTreeLeaf
     public func get<T>( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
         return addMethod( .GET, cb, url )
     }
-//
-//    @discardableResult
-//    public func post( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil, _ ct: RouterClass.Type ) -> Endpoint { return addMethod( .POST  , cb, url, ct )
-//    }
+
+    @discardableResult
+    public func post<T>( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addMethod( .POST, cb, url )
+    }
     
     @discardableResult
-    public func put<T:RouterContext> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+    public func put<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
         return addMethod( .PUT, cb, url )
     }
     
     @discardableResult
-    public func patch<T:RouterContext>  ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return addMethod( .PATCH , cb, url ) }
+    public func patch<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addMethod( .PATCH , cb, url )
+    }
 
     @discardableResult
-    public func delete<T:RouterContext> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return addMethod( .DELETE, cb, url ) }
+    public func delete<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addMethod( .DELETE, cb, url )
+    }
     
-    public func addMethod<T:RouterContext> ( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
+    public func addMethod<T> ( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
 //        methods[ method ] = ( cb: cb, extra_url: url != nil ? RouterPath( url! ): nil, ct: ct )
         
         methods[ method ] = MethodEndpoint(cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )

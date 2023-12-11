@@ -78,7 +78,10 @@ public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 
 public protocol RouterContextProtocol : AnyObject
 {
-    init( _ request: RouterRequest, _ response: RouterResponse )
+    var request: RouterRequest { get }
+    var response: RouterResponse { get }
+    
+    init( _ request: RouterRequest, _ response: RouterResponse ) throws
     
     func queryParam ( _ name: String ) -> String?
     func urlParam<T> ( _ name: String ) throws -> T
@@ -86,86 +89,204 @@ public protocol RouterContextProtocol : AnyObject
     
     func bodyAsData() -> Data?
     func bodyAsJSON() -> Any?
-    
-    var request: RouterRequest! { get set }
-    var response: RouterResponse! { get set }
-    
+        
     func willExectute() throws
     func didExecute() throws
 }
 
-@objc
-open class RouterContext : MIOCoreContext, RouterContextProtocol
+extension RouterContextProtocol
 {
-    public var request: RouterRequest!
-    public var response: RouterResponse!
-
-    public required init ( _ request: RouterRequest, _ response: RouterResponse ) {
-        self.request  = request
-        self.response = response
-    }
+    public func willExectute() throws { }
+    public func didExecute() throws { }
     
-//    public required init ( ) {}
-
-    open func urlParam<T> ( _ name: String ) throws -> T {
+    public func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )
     }
     
-    open func queryParam ( _ name: String ) -> String? {
+    public func queryParam ( _ name: String ) -> String? {
         return request.queryParameters[ name ]
     }
     
-    open func bodyAsData() -> Data? {
+    public func bodyAsData() -> Data? {
         return request.body
     }
 
-    open func bodyAsJSON() -> Any? {
-        if request.body == nil { return nil }
-        return try? JSONSerialization.jsonObject( with: request.body! )
+    public func bodyAsJSON<T>() throws -> T {
+        if request.body == nil { throw ServerError.missingJSONBody() }
+        let json = try JSONSerialization.jsonObject( with: request.body! ) as? T
+        if json == nil { throw ServerError.invalidJSONBodyCast() }
+        return json!
     }
     
-    var _body_as_json: [String : Any]? = nil
-    
-    var _body: Any? = nil
     public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
-        if _body == nil {
-            let json = bodyAsJSON() as? [String:Any]
-            
-            if json == nil {
-                if optional { return nil }
-                throw ServerError.missingJSONBody( )
-            }
-            
-            _body = json
+        let json = bodyAsJSON()
+        if json == nil {
+            if optional { return nil }
+            throw ServerError.missingJSONBody( )
         }
-        
-        if let dict = _body as? [ String:Any ] {
-            
+
+        if let dict = json as? [ String:Any ] {
+
             if dict.keys.contains(name) {
                 if optional { return nil }
                 throw ServerError.fieldNotFound( name )
             }
-            
-            
+
             if let value = dict[ name ] as? T {
                 return value
             }
-            
+
             if optional { return nil }
             throw ServerError.fieldNotFound( name )
         }
-                
-//        if let value = _body![ name ] as? T {
-//            return value
-//        }
 
         if optional { return nil }
         throw ServerError.fieldNotFound( name )
     }
     
+//    public func sendOKResponse ( _ json : Any? = nil ) throws {
+//        response.status(.ok)
+//
+//        if json == nil {
+//
+//        } else if json is Data {
+//            response.send( data: json as! Data )
+//        } else if let ret = json as? ResponseContext {
+//            response.send( json: ret.asJson( ) )
+//        } else if let ret = json as? String {
+//            response.send( ret )
+//        } else {
+//            let response_json = json is [Any] || json is [String: Any] ? [ "status" : "OK", "data" : json! ]
+//                              :                                          [ "status" : "OK" ]
+//            #if SAVE_RECORD
+//            if record_request {
+//                g_request_recorder.append( RequestRecorded( self, response_json ) )
+//            }
+//            #endif
+//
+//            response.send(json: MIOCoreSerializableJSON( response_json ) as! [String:Any] )
+//        }
+//
+//        try response.end( )
+//    }
+//
+    
+//    public func sendErrorResponse ( _ error : Error, httpStatus : HTTPResponseStatus = .badRequest) throws {
+//
+//        response.status( httpStatus )
+//
+//        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
+//
+//        #if SAVE_RECORD
+//        if record_request {
+//            g_request_recorder.append( RequestRecorded( self, response_json ) )
+//        }
+//        #endif
+//
+//        response.send( json: response_json )
+//
+//        try response.end( )
+//    }
+
+}
+
+
+@objc
+open class RouterContext : MIOCoreContext, RouterContextProtocol
+//extension RouterContextProtocol
+{
+    public var request: RouterRequest
+    public var response: RouterResponse
+    
+    public required init ( _ request: RouterRequest, _ response: RouterResponse ) throws {
+        self.request  = request
+        self.response = response
+    }
+    
+    public func urlParam<T> ( _ name: String ) throws -> T {
+        return try MIOCoreParam( request.parameters, name )
+    }
+    
+    public func queryParam ( _ name: String ) -> String? {
+        return request.queryParameters[ name ]
+    }
+    
+    public func bodyAsData() -> Data? {
+        return request.body
+    }
+
+    public func bodyAsJSON() -> Any? {
+        if request.body == nil { return nil }
+        return try? JSONSerialization.jsonObject( with: request.body! )
+    }
+    
+//    var _body_as_json: [String : Any]? = nil
+//    var _body: Any? = nil
+//    
+//    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
+//        if _body == nil {
+//            let json = bodyAsJSON() as? [String:Any]
+//            
+//            if json == nil {
+//                if optional { return nil }
+//                throw ServerError.missingJSONBody( )
+//            }
+//            
+//            _body = json
+//        }
+//        
+//        if let dict = _body as? [ String:Any ] {
+//            
+//            if dict.keys.contains(name) {
+//                if optional { return nil }
+//                throw ServerError.fieldNotFound( name )
+//            }
+//            
+//            
+//            if let value = dict[ name ] as? T {
+//                return value
+//            }
+//            
+//            if optional { return nil }
+//            throw ServerError.fieldNotFound( name )
+//        }
+//                
+////        if let value = _body![ name ] as? T {
+////            return value
+////        }
+//
+//        if optional { return nil }
+//        throw ServerError.fieldNotFound( name )
+//    }
+        
+    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
+        let json = bodyAsJSON()
+        if json == nil {
+            if optional { return nil }
+            throw ServerError.missingJSONBody( )
+        }
+
+        if let dict = json as? [ String:Any ] {
+
+            if dict.keys.contains(name) {
+                if optional { return nil }
+                throw ServerError.fieldNotFound( name )
+            }
+
+            if let value = dict[ name ] as? T {
+                return value
+            }
+
+            if optional { return nil }
+            throw ServerError.fieldNotFound( name )
+        }
+
+        if optional { return nil }
+        throw ServerError.fieldNotFound( name )
+    }
     
     open func willExectute() throws { }
-    open func didExecute() throws { }    
+    open func didExecute() throws { }
 
     
 //    public func sendOKResponse ( _ json : Any? = nil ) throws {

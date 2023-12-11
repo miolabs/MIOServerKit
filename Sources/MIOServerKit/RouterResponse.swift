@@ -31,27 +31,27 @@ open class RouterResponse
     
 //    @discardableResult
 //    public func send ( data: Data ) -> RouterResponse {
-//        bodyData = data
+//        body = data
 //        return self
 //    }
 //
 //    @discardableResult
 //    public func send ( json:[Any] ) throws -> RouterResponse {
 //        headers["Content-Type"] = "application/json"
-//        bodyData = try MIOCoreJsonValue( withJSONObject: json )
+//        body = try MIOCoreJsonValue( withJSONObject: json )
 //        return self
 //    }
 //
 //    @discardableResult
 //    public func send ( json:[String:Any] ) throws -> RouterResponse {
 //        headers["Content-Type"] = "application/json"
-//        bodyData = try MIOCoreJsonValue( withJSONObject: json )
+//        body = try MIOCoreJsonValue( withJSONObject: json )
 //        return self
 //    }
 //
 //    @discardableResult
 //    public func send (_ text:String ) -> RouterResponse {
-//        bodyData = text.data( using: .utf8 )
+//        body = text.data( using: .utf8 )
 //        return self
 //    }
 

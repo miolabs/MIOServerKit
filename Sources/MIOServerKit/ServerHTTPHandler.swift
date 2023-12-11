@@ -162,7 +162,8 @@ class ServerHTTPHandler: ChannelInboundHandler
                 let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
                 context.write(self.wrapOutboundOut(content), promise: nil)
             }
-            catch {
+            catch 
+            {
                 // TODO Error response
                 self.buffer.clear()
                 self.buffer.writeString( error.localizedDescription )
@@ -173,7 +174,7 @@ class ServerHTTPHandler: ChannelInboundHandler
                 let head = HTTPServerResponsePart.head( responseHead )
                 context.write(self.wrapOutboundOut( head ), promise: nil)
                 
-                let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
+                let content = HTTPServerResponsePart.body( .byteBuffer( buffer!.slice() ) )
                 context.write(self.wrapOutboundOut(content), promise: nil)
             }
             
@@ -197,10 +198,8 @@ class ServerHTTPHandler: ChannelInboundHandler
             // if we are idle or waiting for a request body to finish we
             // will close the channel immediately.
             switch self.state {
-            case .idle, .waitingForRequestBody:
-                context.close(promise: nil)
-            case .sendingResponse:
-                self.keepAlive = false
+            case .idle, .waitingForRequestBody: context.close(promise: nil)
+            case .sendingResponse: self.keepAlive = false
             }
         default:
             context.fireUserInboundEventTriggered(event)

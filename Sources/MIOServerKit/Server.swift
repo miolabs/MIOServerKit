@@ -13,8 +13,6 @@ import NIOHTTP1
 
 public let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
-public typealias http_mehod = HTTPMethod
-
 open class Server
 {
     var docsPath = "/dev/null"
