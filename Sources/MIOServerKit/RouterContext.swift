@@ -8,6 +8,7 @@
 
 import Foundation
 import MIOCore
+import MIOCoreContext
 import NIOHTTP1
 
 public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
@@ -77,7 +78,7 @@ public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 
 public protocol RouterContextProtocol : AnyObject
 {
-    init()
+    init( _ request: RouterRequest, _ response: RouterResponse )
     
     func queryParam ( _ name: String ) -> String?
     func urlParam<T> ( _ name: String ) throws -> T
@@ -99,12 +100,12 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     public var request: RouterRequest!
     public var response: RouterResponse!
 
-    public init ( _ request: RouterRequest, _ response: RouterResponse ) {
+    public required init ( _ request: RouterRequest, _ response: RouterResponse ) {
         self.request  = request
         self.response = response
     }
     
-    public override required init ( ) {}
+//    public required init ( ) {}
 
     open func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )

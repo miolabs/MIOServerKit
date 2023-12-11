@@ -1,4 +1,4 @@
-// swift-tools-version:5.1
+// swift-tools-version:5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -17,12 +17,9 @@ let package = Package(
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "0.4.0"),
-        .package(url: "https://github.com/miolabs/MIOCore.git", .branch("master")),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "0.4.0"),
+        .package(url: "https://github.com/miolabs/MIOCore.git", branch: "master"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.48.0"),
-        // .package(url: "https://github.com/miolabs/MIOCoreData.git", .branch("master")),
-        // .package(url: "https://github.com/miolabs/MIODB.git", .branch("master")),
-        // .package(url: "https://github.com/miolabs/MIOPersistentStore.git", .branch("master")),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -31,7 +28,8 @@ let package = Package(
             name: "MIOServerKit",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                "MIOCore", // "MIOCoreData", "MIODB", "MIOPersistentStore"
+                .product(name: "MIOCore", package: "MIOCore"),
+                .product(name: "MIOCoreContext", package: "MIOCore"),
                 .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
