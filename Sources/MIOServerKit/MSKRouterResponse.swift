@@ -7,6 +7,7 @@
 
 import Foundation
 import Kitura
+import KituraNet
 
 open class MSKRouterResponse
 {
@@ -18,7 +19,7 @@ open class MSKRouterResponse
     
     @discardableResult
     public func status ( _ status:MSKHTTPStatusCode ) -> MSKRouterResponse {
-        response!.status(status)
+        response!.status( KituraNet.HTTPStatusCode( rawValue: status.rawValue )! )
         return self
     }
     

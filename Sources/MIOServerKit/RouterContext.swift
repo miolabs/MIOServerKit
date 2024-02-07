@@ -12,35 +12,36 @@ import MIOCoreContext
 
 public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
-public struct RequestRecorded {
-    public var method  : RouterMethod
-    public var url     : String
-    public var body    : Any?
-    public var response: [String:Any?]
-    
-    public init ( _ context: RouterContext, _ res: [String:Any?] ) {
-        method   = context.request.method
-        url      = context.request.url.path
-        body     = try? context.request.bodyAsJSON()
-        response = res
-    }
-    
-    
-    public func as_swift_code ( ) -> [Any?] {
-        return [method.rawValue,url,body,response]
-    }
-}
-
 #if DEBUG
-var g_request_recorder: [RequestRecorded] = []
+
+//public struct RequestRecorded {
+//    public var method  : RouterMethod
+//    public var url     : String
+//    public var body    : Any?
+//    public var response: [String:Any?]
+//    
+//    public init ( _ context: RouterContext, _ res: [String:Any?] ) {
+//        method   = context.request.method
+//        url      = context.request.url.path
+//        body     = try? context.request.bodyAsJSON()
+//        response = res
+//    }
+//    
+//    
+//    public func as_swift_code ( ) -> [Any?] {
+//        return [method.rawValue,url,body,response]
+//    }
+//}
+
+// var g_request_recorder: [RequestRecorded] = []
 
 
-public func recorded_test ( ) -> [ Any ] {
-    return g_request_recorder.map{ $0.as_swift_code() }
-}
+//public func recorded_test ( ) -> [ Any ] {
+//    return g_request_recorder.map{ $0.as_swift_code() }
+//}
 
 
-public func clean_recorded_test ( ) { g_request_recorder = [] }
+// public func clean_recorded_test ( ) { g_request_recorder = [] }
 #endif
 
 
@@ -63,7 +64,7 @@ public struct ResponseContext {
         self.errorCode = errorCode
     }
     
-    func asJson ( ) -> [String:Any] {
+    public func asJson ( ) -> [String:Any] {
         return [ "data": MIOCoreSerializableJSON( data )
                , "status": "OK"
                , "error": error
@@ -72,68 +73,85 @@ public struct ResponseContext {
 }
 
 
-public protocol RouterContextProtocol {
+public protocol RouterContextProtocol  // : MIOCoreContextProtocol
+{
+    var request: MSKRouterRequest { get set }
+    var response: MSKRouterResponse { get set }
+  //  var _body_as_json: [String:Any]? { get set } // to define in derivated class
+    var body_as_json: [String:Any] { get throws }
+    
     func queryParam ( _ name: String ) -> String?
     func urlParam<T> ( _ name: String ) throws -> T
     func bodyParam<T> (_ name: String, optional: Bool) throws -> T?
+    
+    func save ( ) throws -> Void
 }
 
 
-@objc open class RouterContext : MIOCoreContext, RouterContextProtocol
-{
-    public var request: MSKRouterRequest
-    public var response: MSKRouterResponse
 
-    public init ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) {
-        self.request  = request
-        self.response = response
-    }
-    
-    public init ( ) {
-        self.request = MSKRouterRequest( )
-        self.response = MSKRouterResponse( )
-    }
-    
-    open func urlParam<T> ( _ name: String ) throws -> T {
+
+//@objc open class RouterContext : MIOCoreContext, RouterContextProtocol
+//{
+//    public var request: MSKRouterRequest
+//    public var response: MSKRouterResponse
+//    
+//    public init ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) {
+//        self.request  = request
+//        self.response = response
+//    }
+//    
+//    public init ( ) {
+//        self.request = MSKRouterRequest( )
+//        self.response = MSKRouterResponse( )
+//    }
+//    
+//    var _body: [String:Any]? = nil
+//    
+//    public var body_as_json: [String : Any]? {
+//        get {
+//            if _body == nil {
+//                _body = try? request.bodyAsJSON()
+//            }
+//            
+//            return _body
+//        }
+//    }
+//}
+
+
+public extension RouterContextProtocol
+{
+    func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )
     }
     
-    open func queryParam ( _ name: String ) -> String? {
+    func queryParam ( _ name: String ) -> String? {
         return request.queryParameters[ name ]
     }
     
-    
-    var _body_as_json: [String : Any]? = nil
-    
-    var _body: [String:Any]? = nil
-    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
-        if _body == nil {
-            let json = try? request.bodyAsJSON()
-            
-            if json == nil {
-                if optional { return nil }
-                throw MIOError.missingJSONBody( )
-            }
-            
-            _body = json
+    func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
+        let body = try? body_as_json
+        
+        if body == nil {
+            if optional { return nil }
+            throw MIOError.missingJSONBody( )
         }
         
-        if !_body!.keys.contains(name) {
+        if !body!.keys.contains(name) {
             if optional { return nil }
             throw MIOError.fieldNotFound( name )
         }
         
         
-        if let value = _body![ name ] as? T {
+        if let value = body![ name ] as? T {
             return value
         }
-
+        
         if optional { return nil }
         throw MIOError.fieldNotFound( name )
     }
 
-    
-    public func sendOKResponse ( _ json : Any? = nil ) throws {
+    func sendOKResponse ( _ json : Any? = nil ) throws {
         response.status(.OK)
         
         if json == nil {
@@ -160,7 +178,7 @@ public protocol RouterContextProtocol {
     }
     
     
-    public func sendErrorResponse ( _ error : Error, httpStatus : MSKHTTPStatusCode = .badRequest) throws {
+    func sendErrorResponse ( _ error : Error, httpStatus : MSKHTTPStatusCode = .badRequest) throws {
         
         response.status( httpStatus )
         
@@ -176,4 +194,6 @@ public protocol RouterContextProtocol {
     
         try response.end( )
     }
+
+    func save ( ) throws { }
 }

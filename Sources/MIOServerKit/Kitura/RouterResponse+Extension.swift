@@ -6,11 +6,12 @@
 //
 
 import Kitura
+import KituraNet
 
 extension RouterResponse
 {
     // TODO: Used in auth server...
-    public func sendOKResponse(json : Any? = nil) -> RouterResponse {
+    public func sendOKResponse (json : Any? = nil) -> RouterResponse {
 
         status(.OK)
         if json == nil {
@@ -23,9 +24,9 @@ extension RouterResponse
     }
 
     // TODO: Used in redsys...
-    public func sendErrorResponse(_ error : Error, httpStatus : HTTPStatusCode = .badRequest) -> RouterResponse {
+    public func sendErrorResponse(_ error : Error, httpStatus : MSKHTTPStatusCode = MSKHTTPStatusCode.badRequest) -> RouterResponse {
 
-        status(httpStatus)
+        status( KituraNet.HTTPStatusCode( rawValue: httpStatus.rawValue )! )
 
         send(json: ["status" : "Error",
                     "error" : error.localizedDescription])

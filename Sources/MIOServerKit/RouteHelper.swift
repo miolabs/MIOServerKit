@@ -9,7 +9,7 @@ import Foundation
 import Kitura
 import KituraCORS
 
-public typealias MSKHTTPStatusCode = HTTPStatusCode
+// public typealias MSKHTTPStatusCode = HTTPStatusCode
 
 public typealias RequestDispatcher<T> = (T) throws -> Any
 
@@ -86,21 +86,24 @@ open class MSKServerRouter<T>
   open func request_dispatcher( _ fn: @escaping RequestDispatcher<T> ) -> RouterHandler {
     
     return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
-        try self.context_dispatcher( RouterContext( MSKRouterRequest( request ), MSKRouterResponse( response ) ), fn )
+        try self.context_dispatcher( self.create_context( MSKRouterRequest( request ), MSKRouterResponse( response ) ), fn )
     }
   }
 
+    open func create_context ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) throws -> T {
+        throw MIOError.notImplemented( )
+    }
   // if fn return nil, nothing will be done
 //  public func request_entity_dispatcher( _ fn: @escaping RequestEntityDispatcher ) -> RouterHandler {
 //    return { (request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws -> Void in
 //        try self.context_dispatcher(request, response, next ) { context in
-//            let entity_id: String = try context.param( "entity_id" )
+//            let entity_id: String = try context.urlParam( "entity_id" )
 //            return try fn( context, entity_id )
 //        }
 //    }
 //  }
 
-    open func context_dispatcher( _ context:RouterContext, _ fn: @escaping RequestDispatcher<T> ) throws -> Void {
+    open func context_dispatcher( _ context: T, _ fn: @escaping RequestDispatcher<T> ) throws -> Void {
         //try _context_dispatcher(context, fn)
     }
         
@@ -120,10 +123,10 @@ open class MSKServerRouter<T>
 //    }
 //  }
 
-    open func willDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
+    open func willDispatchRequest ( _ context: T, responseData:Any? ) {
     }
     
-    open func didDispatchRequest ( _ context: RouterContext, responseData:Any? ) {
+    open func didDispatchRequest ( _ context: T, responseData:Any? ) {
     }
 }
 

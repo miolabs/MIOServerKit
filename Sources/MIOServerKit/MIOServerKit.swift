@@ -99,7 +99,7 @@ public class MIOServerKit
 extension MSKRouterResponse {
 
     // TODO: Used in auth server...
-    public func sendOKResponse(json : Any? = nil) -> MSKRouterResponse {
+    public func sendOKResponse (json : Any? = nil) -> MSKRouterResponse {
 
         self.status(.OK)
         if json == nil {
@@ -112,7 +112,8 @@ extension MSKRouterResponse {
     }
 
     // TODO: Used in redsys...
-    public func sendErrorResponse(_ error : Error, httpStatus : HTTPStatusCode = .badRequest) -> MSKRouterResponse {
+    @discardableResult
+    public func sendErrorResponse (_ error : Error, httpStatus : HTTPStatusCode = .badRequest) -> MSKRouterResponse {
 
         self.status(httpStatus)
 
