@@ -19,7 +19,7 @@ let package = Package(
         .package(url: "https://github.com/Kitura/Kitura.git", from: "2.9.200"),
         .package(url: "https://github.com/Kitura/HeliumLogger.git", from: "1.9.200"),
         .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
-        .package(url: "https://github.com/miolabs/MIOCore.git", .branch("master")),
+        .package(url: "https://github.com/miolabs/MIOCore.git", .branch("context")),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
