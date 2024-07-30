@@ -75,7 +75,7 @@ final class MIOServerKitTests: XCTestCase {
 
     
     func testEndpointTree() {
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         let route_1 = Endpoint( "/entity/Product" ).get( nop )
         let route_2 = Endpoint( "/entity/ProductPlace" ).get( nop )
 
@@ -90,7 +90,7 @@ final class MIOServerKitTests: XCTestCase {
     }
 
     func testEndpointTreeVarsGoLast() {
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         let route_1 = Endpoint( "/entity/:name" ).get( nop )
         let route_2 = Endpoint( "/entity/ProductPlace" ).get( nop )
         var route_vars: RouterPathVars = [:]
@@ -104,7 +104,7 @@ final class MIOServerKitTests: XCTestCase {
 
     
     func testEndpointWithExtraVars() {
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         let route_1 = Endpoint( "/entity/:name" ).patch( nop, ":entity-id" )
         var route_vars: RouterPathVars = [:]
 
@@ -117,7 +117,7 @@ final class MIOServerKitTests: XCTestCase {
     }
 
     func testEndpointWithExtraVarsRegExp() {
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
         let route_1 = Endpoint( "/entity/:name" ).patch( nop, ":entity-id\(asUUID)" )
@@ -135,7 +135,7 @@ final class MIOServerKitTests: XCTestCase {
     }
 
     func testEndpointWithExtraVarsRegExpPrio() {
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
         let route_1 = Endpoint( "/entity/:name\(asUUID)" ).patch( nop )
@@ -160,7 +160,7 @@ final class MIOServerKitTests: XCTestCase {
         let route_sync_all_ann = Endpoint( "/schema/:scheme\(uuidRegexRoute)/all-sync-annotations"  ).get( nop )
 
 
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         tree.insert( route_home )
         tree.insert( route_hook )
         tree.insert( route_hook_version )
@@ -188,7 +188,7 @@ final class MIOServerKitTests: XCTestCase {
         let route_hook = Endpoint( "/hook/"  ).get( nop )
         let route_hook_version = Endpoint( "/hook/version" ).get( nop )
 
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         tree.insert( route_home )
         tree.insert( route_hook_version )
         tree.insert( route_hook )
@@ -204,7 +204,7 @@ final class MIOServerKitTests: XCTestCase {
         let route_home = Endpoint( "/" ).get( nop )
         let route_hook_version = Endpoint( "/hook/version" ).get( nop )
 
-        let tree = EndpointTree<Any>( )
+        let tree = EndpointTree( )
         tree.insert( route_home )
         tree.insert( route_hook_version )
         

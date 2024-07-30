@@ -1,18 +1,15 @@
 //
-//  Endpoint.swift
-//
+//  File.swift
+//  
 //
 //  Created by David Trallero on 21/10/21.
-//  Modified by Javier Segura on 12/03/23.
 //
 
 import Foundation
-import MIOCore
 
 public typealias RouterPathVars = [String:String]
 
-public final class RouterPathNode: Equatable
-{
+public class RouterPathNode: Equatable {
     var name: String
     var key: String
     var is_var: Bool
@@ -48,7 +45,8 @@ public final class RouterPathNode: Equatable
             key = String( key.dropLast() )
         }
     }
-        
+    
+    
     public func match ( _ node: RouterPathNode ) -> Bool {
         return is_var && node.is_var ? name == node.name
              : regex != nil ?
@@ -56,19 +54,6 @@ public final class RouterPathNode: Equatable
              : is_var || name == node.name
     }
 }
-
-extension RouterPathNode: CustomDebugStringConvertible {
-    public var debugDescription: String {
-        return """
-                name: \(name)
-                key: \(key)
-                isVar: \(is_var)
-                isOptional: \(is_optional)
-                regex: \(regex?.description ?? "nil")
-                """
-    }
-}
-
 
 
 public func ==( left:RouterPathNode, right:RouterPathNode ) -> Bool {
@@ -78,20 +63,18 @@ public func ==( left:RouterPathNode, right:RouterPathNode ) -> Bool {
 
 public typealias RouterPathDiff = ( common: RouterPath, left: RouterPath, right: RouterPath )
 
-public class RouterPath
-{
+public class RouterPath {
     var parts: [RouterPathNode]
 
-    public init ( _ path: String = "" ) {
+    init ( _ path: String = "" ) {
         parts = path.components(separatedBy: "/").filter{ $0 != "" }.map{ RouterPathNode( $0 ) }
     }
 
-    public init ( from: [RouterPathNode] ) {
+    init ( from: [RouterPathNode] ) {
         parts = from
     }
     
     func is_empty ( ) -> Bool { return parts.count == 0 }
-    
     public func index_part ( ) -> String { return parts[ 0 ].name }
     public func starts_with_var ( ) -> Bool { return parts.count > 0 && parts[ 0 ].is_var }
     public func starts_with_regex ( ) -> Bool { return parts.count > 0 && parts[ 0 ].regex != nil }
@@ -162,19 +145,14 @@ public class RouterPath
     public func join ( _ extra: RouterPath ) {
         parts.append(contentsOf: extra.parts )
     }
-
-    public func joining ( _ extra: RouterPath ) -> RouterPath {
-        return RouterPath( from: parts + extra.parts )
-    }
-
+    
     func debug_path ( ) -> String {
         return parts.count == 0 ? "/"
              : parts.map{ $0.name }.joined(separator: "/")
     }
 }
 
-public enum EndpointMethod: String
-{
+public enum EndpointMethod: String {
     case GET     = "GET"
     case POST    = "POST"
     case PUT     = "PUT"
@@ -183,9 +161,8 @@ public enum EndpointMethod: String
     case OPTIONS = "OPTIONS"
 }
 
-public class EndpointTreeLeaf
-{
-    public var path: RouterPath
+public class EndpointTreeLeaf {
+    var path: RouterPath
 
     public init ( _ url: String = "" ) {
         path = RouterPath( url )
@@ -223,8 +200,7 @@ public class EndpointTreeLeaf
 }
 
 
-public class EndpointTreeNode
-{
+public class EndpointTreeNode<T> {
     var value: EndpointTreeLeaf?
     var nodes: [String:EndpointTreeNode] = [:]
     var var_nodes: [EndpointTreeNode] = []
@@ -234,8 +210,7 @@ public class EndpointTreeNode
         value = leaf
     }
     
-    func clone ( ) -> EndpointTreeNode 
-    {
+    func clone ( ) -> EndpointTreeNode {
         let cloned = EndpointTreeNode( )
         
         cloned.value     = value
@@ -246,16 +221,14 @@ public class EndpointTreeNode
         return cloned
     }
     
-    func clean ( ) 
-    {
+    func clean ( ) {
         value     = nil
         nodes     = [:]
         var_nodes = []
         null_node = nil
     }
 
-    func insert ( _ ep: EndpointTreeLeaf ) 
-    {
+    func insert ( _ ep: EndpointTreeLeaf ) {
         // CASO MINIMAL
         // HAS (null)
         // INS: /a/b/c
@@ -267,10 +240,8 @@ public class EndpointTreeNode
         }
     }
     
-    func insert ( _ node: EndpointTreeNode ) 
-    {
-        if value == nil || node.is_null_node() 
-        {
+    func insert ( _ node: EndpointTreeNode ) {
+        if value == nil || node.is_null_node() {
           // CASE 1:
           // HAS:
           // (null)
@@ -285,9 +256,7 @@ public class EndpointTreeNode
           //
           // CASE 1.1: We do insert the null_node
           insert_subnode( node )
-        } 
-        else
-        {
+        } else {
             // var unused_vars: RouterPathVars = [:]
             let root_diff = value!.diff( node.value! /*, &unused_vars */ )
             
@@ -298,16 +267,13 @@ public class EndpointTreeNode
             // (null)
             //   - entity
             //   - book
-            if root_diff.common.is_empty() 
-            {
+            if root_diff.common.is_empty() {
                 let cloned = self.clone( )
                 self.clean( )
                 
                 insert_subnode( cloned )
                 insert_subnode( node )
-            } 
-            else
-            {
+            } else {
                 // CASE 2: (left is NOT empty)
                 // HAS /entity/A     OR /entity/A/A1
                 //             - A1
@@ -326,8 +292,7 @@ public class EndpointTreeNode
                 //       - A1
                 node.value!.set_path( root_diff.right )
 
-                if !root_diff.left.is_empty() 
-                {
+                if !root_diff.left.is_empty() {
                     let cloned = self.clone( )
                     cloned.value!.set_path( root_diff.left )
 
@@ -345,10 +310,8 @@ public class EndpointTreeNode
 
     
     // Leaf deriva de node? Y es el node el que tiene el Path!??
-    func insert_subnode ( _ n: EndpointTreeNode ) 
-    {
-        if n.is_null_node() 
-        {
+    func insert_subnode ( _ n: EndpointTreeNode ) {
+        if n.is_null_node() {
             // CASE:
             // HAS /hook/version
             // INS /hook
@@ -364,12 +327,9 @@ public class EndpointTreeNode
             
             // overwrite? should we launch exception?
             null_node = n
-        } 
-        else if n.starts_with_var() {
+        } else if n.starts_with_var() {
             var_nodes.append( n )
-        } 
-        else
-        {
+        } else {
             let key = n.index_part()
             
             n.value!.set_path( n.value!.path.drop_first() )
@@ -387,20 +347,17 @@ public class EndpointTreeNode
     public func starts_with_regex ( ) -> Bool { return value?.starts_with_regex() ?? false }
     public func is_null_node ( ) -> Bool { return value == nil || value!.path.is_empty() }
     
-    func find (  _ route: RouterPath ) -> EndpointTreeNode? 
-    {
+    func find (  _ route: RouterPath ) -> EndpointTreeNode? {
         if value == nil {
             return find_subnode( route )
-        } 
-        else
-        {
+        } else {
             if route.is_empty() && value!.path.is_empty() {
                 return self
             }
             
             let diff = value!.diff( route )
 
-            if diff.common.is_empty() && !value!.path.is_empty() {
+            if diff.common.is_empty() {
                 return nil
             } else {
                 if diff.right.is_empty() && diff.left.is_empty() {
@@ -413,21 +370,16 @@ public class EndpointTreeNode
     }
     
     
-    func find_subnode ( _ route: RouterPath ) -> EndpointTreeNode? 
-    {
+    func find_subnode ( _ route: RouterPath ) -> EndpointTreeNode? {
         if route.is_empty() {
             return null_node?.find( route )
-        } 
-        else if route.starts_with_var()
-        {
+        } else if route.starts_with_var() {
             for vnode in var_nodes {
                 if let leaf = vnode.find( route ) {
                     return leaf
                 }
             }
-        } 
-        else 
-        {
+        } else {
             let key = route.index_part()
             
             if nodes.keys.contains( key ) {
@@ -439,13 +391,12 @@ public class EndpointTreeNode
     }
 
     
-    public func match ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint?
-    {
+    func match ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint<T>? {
         if value == nil {
             return match_subnode( method, route, &vars )
         } else {
             if route.is_empty() && value!.path.is_empty() {
-                return self.value as? Endpoint
+                return self.value as? Endpoint<T>
             }
             
             let diff = value!.match( method, route, &vars )
@@ -454,7 +405,7 @@ public class EndpointTreeNode
                 return nil
             } else {
                 if diff!.right.is_empty() && diff!.left.is_empty() {
-                    return self.value as? Endpoint
+                    return self.value as? Endpoint<T>
                 }
 
                 return match_subnode( method, diff!.right, &vars )
@@ -463,8 +414,7 @@ public class EndpointTreeNode
     }
     
     
-    func match_subnode ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint? 
-    {
+    func match_subnode ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint<T>? {
         if route.is_empty() {
             return null_node?.match( method, route, &vars )
         }
@@ -472,17 +422,16 @@ public class EndpointTreeNode
         let key = route.index_part()
         
         if nodes.keys.contains( key ) {
-            return nodes[ key ]!.match( method, route.drop_first( ), &vars )
-        } 
-        else
-        {
-            for vnode in var_nodes {
-                var leaf_vars: RouterPathVars = [:]
-                
-                if let leaf = vnode.match( method, route, &leaf_vars ) {
-                    vars.merge( leaf_vars ){ (old,new) in new }
-                    return leaf
-                }
+            let ret = nodes[ key ]!.match( method, route.drop_first( ), &vars )
+            if ret != nil { return ret }
+        }
+
+        for vnode in var_nodes {
+            var leaf_vars: RouterPathVars = [:]
+            
+            if let leaf = vnode.match( method, route, &leaf_vars ) {
+                vars.merge( leaf_vars ){ (old,new) in new }
+                return leaf
             }
         }
         
@@ -497,8 +446,7 @@ public class EndpointTreeNode
     }
     
     
-    public func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) 
-    {
+    public func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
         func pad ( ) -> String {
             return "".padding(toLength: spaces, withPad: " ", startingAt: 0)
         }
@@ -510,7 +458,7 @@ public class EndpointTreeNode
         }
         
         for (key,n) in nodes {
-            n.debug_info( spaces + 2, key )
+            n.debug_info( spaces + 2, key + "/" )
         }
         
         for n in var_nodes {
@@ -523,86 +471,29 @@ public class EndpointTreeNode
     }
 }
 
+public typealias EndpoingRequestDispatcher<T> = (T) throws -> Any?
 
-public typealias EndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) throws -> Any?
 
-protocol MethodEndpointExecutionProtocol
-{
-    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
-}
-
-public struct MethodEndpoint
-{
-    struct EndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
-    {
-        let cb: EndpointRequestDispatcher<T>
-        
-        init ( _ cb: @escaping EndpointRequestDispatcher<T> ) {
-            self.cb = cb
-        }
-        
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping ( Any? ) throws -> Void ) throws
-        {
-            let ctx = try T.init( request, response )
-            try ctx.willExectute()
-            let result = try cb( ctx )
-            try completion( result )
-            try ctx.didExecute()
-        }
-    }
-    
-    var wrapper: any MethodEndpointExecutionProtocol
-    var extra_url: RouterPath?
-
-    init <T:RouterContext>(cb: @escaping ( _ context: T ) throws -> Any?, extra_url: RouterPath? = nil )
-    {
-        wrapper = EndpointWrapper( cb )
-        self.extra_url = extra_url
-    }
-    
-    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
-    {
-        try wrapper.run( request, response, completion )
-    }
-}
-
-public class Endpoint : EndpointTreeLeaf
-{
-//   public typealias RouterClass = RouterContextProtocol
-        
-    public var methods: [ EndpointMethod : MethodEndpoint ] = [:]
-    
-//    public var methods: [ EndpointMethod: (cb: EndpointRequestDispatcher<T>, extra_url: RouterPath?, ct: RouterContextProtocol) ] = [:]
-        
-    @discardableResult
-    public func get<T>( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .GET, cb, url )
-    }
-
-    @discardableResult
-    public func post<T>( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .POST, cb, url )
-    }
+public class Endpoint<T>: EndpointTreeLeaf {
+    public var methods: [ EndpointMethod: (cb: EndpoingRequestDispatcher<T>, extra_url: RouterPath?)] = [:]
     
     @discardableResult
-    public func put<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .PUT, cb, url )
-    }
+    public func get    ( _ cb: @escaping EndpoingRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .GET   , cb, url ) }
     
     @discardableResult
-    public func patch<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .PATCH , cb, url )
-    }
-
-    @discardableResult
-    public func delete<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .DELETE, cb, url )
-    }
+    public func post   ( _ cb: @escaping EndpoingRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .POST  , cb, url ) }
     
-    public func addMethod<T> ( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
-//        methods[ method ] = ( cb: cb, extra_url: url != nil ? RouterPath( url! ): nil, ct: ct )
-        
-        methods[ method ] = MethodEndpoint(cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
+    @discardableResult
+    public func put    ( _ cb: @escaping EndpoingRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .PUT   , cb, url ) }
+    
+    @discardableResult
+    public func patch  ( _ cb: @escaping EndpoingRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .PATCH , cb, url ) }
+    
+    @discardableResult
+    public func delete ( _ cb: @escaping EndpoingRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .DELETE, cb, url ) }
+    
+    func add_method ( _ method: EndpointMethod, _ cb: @escaping EndpoingRequestDispatcher<T>, _ url: String? ) -> Endpoint {
+        methods[ method ] = (cb: cb, extra_url: url != nil ? RouterPath( url! ) : nil )
         return self
     }
 
@@ -612,12 +503,12 @@ public class Endpoint : EndpointTreeLeaf
         var super_vars: RouterPathVars = [:]
 
         if var ret = super.match( method, url, &super_vars ) {
-            let entry = methods[ method ]
+            let entry = methods[ method ]!
             var extra_vars: RouterPathVars = [:]
 
-            if entry?.extra_url != nil {
+            if entry.extra_url != nil {
                 if !ret.right.is_empty() {
-                    if let extra_ret = entry?.extra_url!.match( ret.right, &extra_vars ) {
+                    if let extra_ret = entry.extra_url!.match( ret.right, &extra_vars ) {
                         ret.common.join( extra_ret.common )
                         ret.right = extra_ret.right
                     } else {
@@ -641,7 +532,7 @@ public class Endpoint : EndpointTreeLeaf
     public override func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
         super.debug_info( spaces, prefix )
         
-        for (key, value ) in methods {
+        for (key, value) in methods {
             let str = "\(key.rawValue) \(value.extra_url?.debug_path() ?? "")"
             print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str)
         }
@@ -649,4 +540,4 @@ public class Endpoint : EndpointTreeLeaf
 }
 
 
-public class EndpointTree : EndpointTreeNode { }
+public class EndpointTree<T> : EndpointTreeNode<T> { }
