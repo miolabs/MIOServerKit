@@ -1,4 +1,4 @@
-// swift-tools-version:5.1
+// swift-tools-version:5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -19,7 +19,8 @@ let package = Package(
         .package(url: "https://github.com/Kitura/Kitura.git", from: "2.9.200"),
         .package(url: "https://github.com/Kitura/HeliumLogger.git", from: "1.9.200"),
         .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
-        .package(url: "https://github.com/miolabs/MIOCore.git", .branch("context")),
+        .package(url: "https://github.com/miolabs/MIOCore.git", branch: "master"),
+        .package(url: "https://github.com/johnno1962/Fortify.git", from:"1.0.2"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -30,10 +31,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 "Kitura",
                 "HeliumLogger",
-                "KituraCORS",
+                .product(name: "KituraCORS", package: "Kitura-CORS"),
                 "MIOCore",
                 .product(name: "MIOCoreContext", package: "MIOCore"),
-                // "MIOCoreData", "MIODB", "MIOPersistentStore"
+                .product(name: "Fortify", package: "Fortify" )
             ]),
         .testTarget(
             name: "MIOServerKitTests",

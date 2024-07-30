@@ -164,7 +164,7 @@ public protocol RouterContextProtocol {
         
         response.status( httpStatus )
         
-        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
+        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : -1 ]
         
         #if SAVE_RECORD
         if record_request {

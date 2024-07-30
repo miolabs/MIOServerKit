@@ -1,6 +1,6 @@
 //
-//  File.swift
-//  
+//  MSKServer.swift
+//
 //
 //  Created by David Trallero on 20/10/21.
 //
@@ -9,7 +9,7 @@ import Kitura
 import KituraCORS
 import LoggerAPI
 import Foundation
-
+import Fortify
 
 public let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
@@ -68,7 +68,15 @@ open class MSKServer<T>: MSKRouter<T> {
         
         if endpoint != nil {
             request.parameters = route_vars
-            try self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
+            do {
+                try Fortify.exec {
+                    try self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
+                }
+            }
+            catch {
+                print( "FATAL ERROR: \(error)" )
+                response.status(.internalServerError)
+            }
         } else {
             // TODO: respond: page not found
             response.status(.notFound)
