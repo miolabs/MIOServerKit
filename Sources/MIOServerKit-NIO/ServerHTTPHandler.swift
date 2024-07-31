@@ -117,7 +117,8 @@ class ServerHTTPHandler: ChannelInboundHandler
         context.writeAndFlush(self.wrapOutboundOut(.end(trailers)), promise: promise)
     }
         
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) 
+    {
         let reqPart = self.unwrapInboundIn(data)
         
         switch reqPart {
@@ -126,6 +127,7 @@ class ServerHTTPHandler: ChannelInboundHandler
             
             infoSavedRequestHead = http_request
             self.infoSavedBodyBytes = 0
+            self.infoSavedBodyBuffer = nil
             
             request = RouterRequest( http_request )
             response = RouterResponse( http_request )
@@ -181,6 +183,9 @@ class ServerHTTPHandler: ChannelInboundHandler
             }
             
             self.completeResponse(context, trailers: nil, promise: nil)
+            
+            self.infoSavedBodyBytes = 0
+            self.infoSavedBodyBuffer = nil
         }
     }
 
