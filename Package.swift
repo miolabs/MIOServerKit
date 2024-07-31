@@ -20,7 +20,7 @@ let package = Package(
         .package(url: "https://github.com/Kitura/HeliumLogger.git", from: "1.9.200"),
         .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
         .package(url: "https://github.com/miolabs/MIOCore.git", branch: "master"),
-        .package(url: "https://github.com/johnno1962/Fortify.git", from:"1.0.2"),
+//        .package(url: "https://github.com/johnno1962/Fortify.git", from:"1.0.2"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0")
     ],
     targets: [
@@ -43,7 +43,7 @@ let package = Package(
                 .product(name: "KituraCORS", package: "Kitura-CORS"),
                 "MIOCore",
                 .product(name: "MIOCoreContext", package: "MIOCore"),
-                .product(name: "Fortify", package: "Fortify" )
+//                .product(name: "Fortify", package: "Fortify" )
             ]),
         .target(
             name: "MIOServerKit-NIO",
@@ -56,7 +56,7 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 "MIOCore",
                 .product(name: "MIOCoreContext", package: "MIOCore"),
-                .product(name: "Fortify", package: "Fortify" )
+//                .product(name: "Fortify", package: "Fortify" )
             ]),
 
         
