@@ -181,6 +181,7 @@ public enum EndpointMethod: String
     case PATCH   = "PATCH"
     case DELETE  = "DELETE"
     case OPTIONS = "OPTIONS"
+    case HEAD    = "HEAD"
 }
 
 public class EndpointTreeLeaf

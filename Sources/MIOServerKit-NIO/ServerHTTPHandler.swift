@@ -66,16 +66,19 @@ class ServerHTTPHandler: ChannelInboundHandler
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request!.method.rawValue )!
-
-        let endpoint = router.root.match( method
+                
+        let endpoint = router.root.match( method == .HEAD ? EndpointMethod.GET : method
                                  , RouterPath( path )
                                  , &route_vars )
 
         if endpoint != nil
         {
-            request.parameters = route_vars
-            let endpoint_spec = endpoint!.methods[ method ]!
-            try self.process( endpoint_spec, route_vars )
+            if method == .HEAD { response.status(.ok); return }
+            else {
+                request.parameters = route_vars
+                let endpoint_spec = endpoint!.methods[ method ]!
+                try self.process( endpoint_spec, route_vars )
+            }
         }
         else
         {
