@@ -12,7 +12,8 @@ actor ServerLogger
 {
     var _logger:Logger
     
-    init() {
+    init() 
+    {
         _logger = Logger( label: "com.miolabs.server-kit" )
         
         var log_level = "info"
@@ -47,7 +48,7 @@ let _logger = ServerLogger()
 
 public func Log( _ level:Logger.Level = .info, _ message:Logger.Message )
 {
-    Task {
+    Task.detached {
         await _logger.log(level: level, message )
     }
 }
