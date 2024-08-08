@@ -34,6 +34,7 @@ actor ServerLogger
         }
         
         _logger.logLevel = level
+        _logger.log(level: .debug, "Setting log level: \(level)")
     }
     
     func log( level: Logger.Level, _ message: Logger.Message ) {
