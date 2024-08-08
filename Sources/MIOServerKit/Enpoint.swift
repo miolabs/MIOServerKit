@@ -545,10 +545,16 @@ public struct MethodEndpoint
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping ( Any? ) throws -> Void ) throws
         {
             let ctx = try T.init( request, response )
-            try ctx.willExectute()
-            let result = try cb( ctx )
-            try completion( result )
-            try ctx.didExecute()
+            do {
+                try ctx.willExectute()
+                let result = try cb( ctx )
+                try completion( result )
+                try ctx.didExecute()
+            }
+            catch {
+                Log( .error, "\(error)")
+                throw error
+            }
         }
     }
     

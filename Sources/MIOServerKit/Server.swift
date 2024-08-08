@@ -26,7 +26,7 @@ open class Server
     {
         _router = routes
         _load_settings()
-        print("Router initialized")
+        Log( .info, "Router initialized" )
     }
         
     open func run ( port:Int ) { }
