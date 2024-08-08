@@ -11,9 +11,9 @@ import Foundation
 import NIO
 import NIOHTTP1
 import MIOServerKit
-import os
+import Logging
 
-let _logger = Logger()
+let _logger = Logger(label: "com.miolabs.server-kit")
 
 open class NIOServer : Server
 {        
@@ -45,7 +45,7 @@ open class NIOServer : Server
             let channel = try bootstrap.bind( host: "0.0.0.0", port: port ).wait()
 
             guard let channelLocalAddress = channel.localAddress else {
-                _logger.fault("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
+                _logger.critical("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
                 fatalError("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
             }
             
@@ -54,7 +54,7 @@ open class NIOServer : Server
             // This will never unblock as we don't close the ServerChannel
             try channel.closeFuture.wait()
         } catch {
-            _logger.fault("\(error)")
+            _logger.critical("\(error)")
             fatalError("\(error)")
         }
     }

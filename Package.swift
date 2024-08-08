@@ -21,7 +21,8 @@ let package = Package(
         .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
         .package(url: "https://github.com/miolabs/MIOCore.git", branch: "master"),
 //        .package(url: "https://github.com/johnno1962/Fortify.git", from:"1.0.2"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0")
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.1"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -32,6 +33,7 @@ let package = Package(
                 .product(name: "MIOCore", package: "MIOCore"),
                 .product(name: "MIOCoreContext", package: "MIOCore"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "Logging", package: "swift-log")
             ]),
 
         .target(
