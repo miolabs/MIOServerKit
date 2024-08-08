@@ -38,7 +38,8 @@ open class NIOServer : Server
         .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true )
         
         do {
-            let channel = try bootstrap.bind( host: "127.0.0.1", port: port ).wait()
+//            let channel = try bootstrap.bind( host: "127.0.0.1", port: port ).wait()
+            let channel = try bootstrap.bind( host: "0.0.0.0", port: port ).wait()
 
             guard let channelLocalAddress = channel.localAddress else {
                 fatalError("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
