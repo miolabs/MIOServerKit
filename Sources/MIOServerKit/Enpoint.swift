@@ -529,7 +529,7 @@ public typealias EndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) t
 
 protocol MethodEndpointExecutionProtocol
 {
-    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
+    func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
 }
 
 public struct MethodEndpoint
@@ -542,9 +542,9 @@ public struct MethodEndpoint
             self.cb = cb
         }
         
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping ( Any? ) throws -> Void ) throws
+        func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping ( Any? ) throws -> Void ) throws
         {
-            let ctx = try T.init( request, response )
+            let ctx = try T.init( settings, request, response )
             do {
                 try ctx.willExectute()
                 let result = try cb( ctx )
@@ -552,7 +552,7 @@ public struct MethodEndpoint
                 try ctx.didExecute()
             }
             catch {
-                Log( .error, "\(error)")
+                _logger.error( "\(error)" )
                 throw error
             }
         }
@@ -567,9 +567,9 @@ public struct MethodEndpoint
         self.extra_url = extra_url
     }
     
-    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
+    public func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
     {
-        try wrapper.run( request, response, completion )
+        try wrapper.run( settings, request, response, completion )
     }
 }
 

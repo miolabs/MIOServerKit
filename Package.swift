@@ -43,7 +43,7 @@ let package = Package(
                 "Kitura",
                 "HeliumLogger",
                 .product(name: "KituraCORS", package: "Kitura-CORS"),
-                "MIOCore",
+                .product(name: "MIOCore", package: "MIOCore"),
                 .product(name: "MIOCoreContext", package: "MIOCore"),
 //                .product(name: "Fortify", package: "Fortify" )
             ]),

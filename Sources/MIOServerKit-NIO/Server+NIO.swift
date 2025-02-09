@@ -13,7 +13,7 @@ import NIOHTTP1
 import MIOServerKit
 import Logging
 
-let _logger = Logger(label: "com.miolabs.server-kit")
+let _logger = Logger(label: "com.miolabs.server-kit-nio")
 
 open class NIOServer : Server
 {        
@@ -27,6 +27,8 @@ open class NIOServer : Server
     
     open override func run ( port:Int )
     {
+        super.run(port: port)
+        
         bootstrap = ServerBootstrap(group: group)
         // Specify backlog and enable SO_REUSEADDR for the server itself
         .serverChannelOption(ChannelOptions.backlog, value: 256)
@@ -48,9 +50,8 @@ open class NIOServer : Server
                 _logger.critical("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
                 fatalError("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
             }
-            
-            _logger.info( "Server started and listening on \(channelLocalAddress), htdocs path \(self.documentsPath)")
-
+                        
+            _logger.info( "Server started and listening on \(channelLocalAddress)" )
             // This will never unblock as we don't close the ServerChannel
             try channel.closeFuture.wait()
         } catch {
@@ -61,7 +62,7 @@ open class NIOServer : Server
     
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
-            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, docsPath: self.documentsPath ) )
+            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, settings: self.settings ) )
         }
     }
 }

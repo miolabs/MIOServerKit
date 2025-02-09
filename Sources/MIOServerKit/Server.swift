@@ -4,16 +4,19 @@
 //
 //  Created by Javier Segura Perez on 30/7/24.
 //
+import Logging
+
+let _logger = Logger(label: "com.miolabs.server-kit")
 
 public let uuid_regex = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
 open class Server
 {
     public var router:Router { return _router }
+    public var settings: ServerSettings { return _settings }
     
     var _router:Router
-    var _settings : [String:Any] = [:]
-    var _docs_path = "/dev/null"
+    var _settings: ServerSettings
     
     // MARK: Initializer
     
@@ -22,13 +25,15 @@ open class Server
     /// ```swift
     ///  let router = MIORouter()
     /// ```
-    public init( routes: Router )
+    public init( routes: Router, settings: [String:Any]? = nil )
     {
         _router = routes
-        _load_settings()
-        Log( .info, "Router initialized" )
+        _settings = Server._load_settings( settings )
     }
         
-    open func run ( port:Int ) { }
+    open func run ( port:Int ) {
+        _logger.info( "Server \(self.settings.name) \(self.settings.version)")
+        _logger.info( "Server settings: \(self.settings)")        
+    }
 }
 

@@ -52,13 +52,13 @@ class ServerHTTPHandler: ChannelInboundHandler
     
     var request:RouterRequest!
     var response:RouterResponse!
-    
-    private let docsPath: String
+        
     private let router: Router
+    private let serverSettings: ServerSettings
     
-    public init( router:Router, docsPath: String ) {
+    public init( router:Router, settings: ServerSettings ) {
         self.router = router
-        self.docsPath = docsPath
+        self.serverSettings = settings
     }
     
     public func dispatchRequest ( ) throws 
@@ -90,7 +90,7 @@ class ServerHTTPHandler: ChannelInboundHandler
 
     open func process( _ endpoint_spec: MethodEndpoint, _ vars: RouterPathVars ) throws 
     {
-        try endpoint_spec.run( request, response) { result in
+        try endpoint_spec.run( serverSettings, request, response) { result in
             
             switch result {
             case let d as Data: self.buffer.writeData( d )
