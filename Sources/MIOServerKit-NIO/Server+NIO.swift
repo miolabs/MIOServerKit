@@ -11,9 +11,9 @@ import Foundation
 import NIO
 import NIOHTTP1
 import MIOServerKit
-import Logging
+import MIOCoreLogger
 
-let _logger = Logger(label: "com.miolabs.server-kit-nio")
+let _logger = MCLogger( label: "com.miolabs.server-kit-nio" )
 
 open class NIOServer : Server
 {        

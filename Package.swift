@@ -55,7 +55,6 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "MIOCore", package: "MIOCore"),
                 .product(name: "MIOCoreContext", package: "MIOCore"),
 //                .product(name: "Fortify", package: "Fortify" )
