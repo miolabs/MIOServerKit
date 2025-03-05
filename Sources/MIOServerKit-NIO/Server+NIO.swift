@@ -24,6 +24,7 @@ open class NIOServer : Server
     let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
     var bootstrap: ServerBootstrap!
+    var channel: EventLoopFuture<Channel>
     
     open override func run ( port:Int )
     {
