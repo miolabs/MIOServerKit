@@ -7,8 +7,6 @@
 import Logging
 import MIOCoreLogger
 
-let _logger = MCLogger( label: "com.miolabs.server-kit" )
-
 public let uuid_regex = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
 open class Server
@@ -33,10 +31,10 @@ open class Server
     }
         
     open func run ( port:Int ) {
-        _logger.info( "\(self.settings.name) \(self.settings.version)")
-        _logger.debug( "Server settings:")
+        Log.info( "\(self.settings.name) \(self.settings.version)")
+        Log.debug( "Server settings:")
         for (k,v) in settings._settings.sorted( by: { $0.key < $1.key } ) {
-            _logger.debug( "- \(k): \(v)")
+            Log.debug( "- \(k): \(v)")
         }
     }
 }

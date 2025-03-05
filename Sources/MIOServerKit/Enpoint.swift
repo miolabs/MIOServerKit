@@ -8,6 +8,7 @@
 
 import Foundation
 import MIOCore
+import MIOCoreLogger
 
 public typealias RouterPathVars = [String:String]
 
@@ -552,7 +553,7 @@ public struct MethodEndpoint
                 try ctx.didExecute()
             }
             catch {
-                _logger.error( "\(error)" )
+                Log.error( "\(error)" )
                 throw error
             }
         }

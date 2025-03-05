@@ -7,6 +7,7 @@
 
 import Foundation
 import MIOCore
+import MIOCoreLogger
 
 public struct ServerSettings
 {
@@ -42,20 +43,20 @@ extension Server {
         if let server_path = settings[ "ServerPath" ] as? String {
             let path = server_path.appending("/App.plist")
             guard let xml = FileManager.default.contents( atPath: path ) else {
-                _logger.warning("Server app.plist not found in path: \(path)")
+                Log.warning("Server app.plist not found in path: \(path)")
                 return
             }
             
             do {
                 guard let items = try PropertyListSerialization.propertyList(from: xml, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
-                    _logger.warning("Server app.plist could not be parsed")
+                    Log.warning("Server app.plist could not be parsed")
                     return
                 }
                 
                 settings.merge(items) { (_, new) in new }
             }
             catch {
-                _logger.error( "\(error)")
+                Log.error( "\(error)")
             }
         }
     }
