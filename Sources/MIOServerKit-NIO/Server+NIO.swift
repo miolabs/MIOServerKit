@@ -13,8 +13,6 @@ import NIOHTTP1
 import MIOServerKit
 import MIOCoreLogger
 
-let _logger = MCLogger( label: "com.miolabs.server-kit-nio" )
-
 open class NIOServer : Server
 {        
     deinit {
@@ -48,15 +46,15 @@ open class NIOServer : Server
             let channel = try bootstrap.bind( host: "0.0.0.0", port: port ).wait()
 
             guard let channelLocalAddress = channel.localAddress else {
-                _logger.critical("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
+                Log.critical("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
                 fatalError("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
             }
                         
-            _logger.info( "Server started and listening on \(channelLocalAddress)" )
+            Log.info( "Server started and listening on \(channelLocalAddress)" )
             // This will never unblock as we don't close the ServerChannel
             try channel.closeFuture.wait()
         } catch {
-            _logger.critical("\(error)")
+            Log.critical("\(error)")
             fatalError("\(error)")
         }
     }
