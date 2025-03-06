@@ -1,11 +1,12 @@
 //
-//  File.swift
-//  
+//  Endpoint.swift
+//
 //
 //  Created by David Trallero on 21/10/21.
 //
 
 import Foundation
+import MIOCoreLogger
 
 public typealias RouterPathVars = [String:String]
 
@@ -195,7 +196,7 @@ public class EndpointTreeLeaf {
     public func starts_with_regex ( ) -> Bool { return path.starts_with_regex() }
     
     public func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
-        print( "".padding(toLength: spaces, withPad: " ", startingAt: 0) + prefix + path.debug_path()  )
+        Log.debug( "\("".padding(toLength: spaces, withPad: " ", startingAt: 0) + prefix + path.debug_path() )" )
     }
 }
 
@@ -454,7 +455,7 @@ public class EndpointTreeNode<T> {
         if value != nil {
             value!.debug_info( spaces, prefix )
         } else {
-            print( pad( ) + (prefix == "" ? "(null)" : prefix) )
+            Log.debug( "\(pad( ) + (prefix == "" ? "(null)" : prefix) )" )
         }
         
         for (key,n) in nodes {
@@ -534,7 +535,7 @@ public class Endpoint<T>: EndpointTreeLeaf {
         
         for (key, value) in methods {
             let str = "\(key.rawValue) \(value.extra_url?.debug_path() ?? "")"
-            print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str)
+            Log.debug( "\("".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str)")
         }
     }
 }

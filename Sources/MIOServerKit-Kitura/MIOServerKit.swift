@@ -1,7 +1,7 @@
 
 import Foundation
 import Kitura
-import HeliumLogger
+import MIOCoreLogger
 
 
 #if canImport(FoundationNetworking)
@@ -32,8 +32,6 @@ public class MIOServerKit
         
         let server_settings = loadSettingsPlist(path: "\(serverPath)/Server.plist")
         settings = settings.merging( server_settings ) { (_, new) in new }
-        
-        HeliumLogger.use(.info)
     }
     
     public func run (port:Int, router:MSKServerRouter<Any>) {
@@ -52,7 +50,7 @@ public class MIOServerKit
     public func loadSettingsPlist(path:String) -> [String : Any]{
         
         guard let xml = FileManager.default.contents(atPath: path) else {
-            print("MIOServerKit: Path not found: \(path)")
+            Log.warning("Path not found: \(path)")
             return [:]
         }
         
