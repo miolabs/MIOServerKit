@@ -1,8 +1,10 @@
-//
-//  File.swift
-//  
-//
-//  Created by Manolo on 5/3/25.
-//
+import XCTest
 
-import Foundation
+#if !canImport(ObjectiveC)
+public func allTests() -> [XCTestCaseEntry] {
+    return [
+        testCase(MIOServerKitNIOTests.allTests),
+    ]
+}
+#endif
+

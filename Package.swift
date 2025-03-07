@@ -60,10 +60,14 @@ let package = Package(
 //                .product(name: "Fortify", package: "Fortify" )
             ]),
 
-        
-        
         .testTarget(
             name: "MIOServerKitTests",
-            dependencies: ["MIOServerKit"]),
+            dependencies: ["MIOServerKit"]
+        ),
+        
+        .testTarget(
+            name: "MIOServerKitNIOTests",
+            dependencies: ["MIOServerKit-NIO"]
+        ),
     ]
 )
