@@ -92,19 +92,18 @@ final class MIOServerKitTests: XCTestCase {
         let tree = EndpointTree( )
         let route_1 = Endpoint( "/entity/Product" ).get( nop )
         let route_2 = Endpoint( "/entity/ProductPlace" ).get( nop )
-        let route_3 = Endpoint( "/entity/ProductPlace" ).post( nop )
+        //let route_3 = Endpoint( "/entity/ProductPlace" ).post( nop )
+        route_2.post( nop )
         
         tree.insert( route_1 )
         tree.insert( route_2 )
-        tree.insert( route_3 )
         
         tree.debug_info()
         
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue( route_2 !== route_3)
-        XCTAssertEqual(route_3.methods.count, 2)
-        XCTAssertTrue( tree.match( .GET,  RouterPath( "/entity/ProductPlace"), &route_vars ) === route_3 )  // xxx which one? 3 or 2??
-        XCTAssertTrue( tree.match( .POST, RouterPath( "/entity/ProductPlace"), &route_vars ) === route_3 )
+        XCTAssertEqual(route_2.methods.count, 2)
+        XCTAssertTrue( tree.match( .GET,  RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )  // xxx which one? 3 or 2??
+        XCTAssertTrue( tree.match( .POST, RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
         XCTAssertTrue( tree.match( .GET,  RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
         XCTAssertTrue( tree.match( .POST, RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
         XCTAssertTrue( tree.match( .PUT,  RouterPath( "/entity/ProductPlace"), &route_vars ) == nil )

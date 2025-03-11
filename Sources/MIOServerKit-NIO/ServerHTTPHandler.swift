@@ -71,7 +71,7 @@ class ServerHTTPHandler: ChannelInboundHandler
                                  , RouterPath( path )
                                  , &route_vars )
 
-        if endpoint != nil
+        if endpoint != nil && endpoint!.methods[ method ] != nil
         {
             if method == .HEAD { response.status(.ok); return }
             else {

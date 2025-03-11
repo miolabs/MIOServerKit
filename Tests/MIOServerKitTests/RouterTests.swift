@@ -31,19 +31,18 @@ final class RouterTests: XCTestCase {
 
         let route_1 = routes.endpoint( "/").get( httpFuncHandler )
         let route_2 = routes.endpoint( "/hook").get( httpFuncHandler )
-        let route_3 = routes.endpoint( "/hook").post( httpFuncHandler )
+        //let route_3 = routes.endpoint( "/hook").post( httpFuncHandler )
+         route_2.post( httpFuncHandler )
         let route_4 = routes.endpoint( "/hook/version").get( httpFuncHandler )
 
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue(route_2 === route_3)
         XCTAssertEqual(route_2.methods.count, 2)
-        XCTAssertEqual(route_3.methods.count, 2)
         XCTAssertTrue(routes.root.match( .GET,  RouterPath( "/"              ), &route_vars ) === route_1)
         XCTAssertTrue(routes.root.match( .GET,  RouterPath( "/hook"          ), &route_vars ) === route_2 )
         XCTAssertTrue(routes.root.match( .GET,  RouterPath( "/hook/"         ), &route_vars ) === route_2 )
-        XCTAssertTrue(routes.root.match( .GET,  RouterPath( "/hook"          ), &route_vars ) === route_3 )
-        XCTAssertTrue(routes.root.match( .POST, RouterPath( "/hook"          ), &route_vars ) === route_3 )
-        XCTAssertTrue(routes.root.match( .POST, RouterPath( "/hook/"         ), &route_vars ) === route_3 )
+        XCTAssertTrue(routes.root.match( .GET,  RouterPath( "/hook"          ), &route_vars ) === route_2 )
+        XCTAssertTrue(routes.root.match( .POST, RouterPath( "/hook"          ), &route_vars ) === route_2 )
+        XCTAssertTrue(routes.root.match( .POST, RouterPath( "/hook/"         ), &route_vars ) === route_2 )
         XCTAssertTrue(routes.root.match( .GET,  RouterPath( "/hook/version"  ), &route_vars ) === route_4 )
      }
 

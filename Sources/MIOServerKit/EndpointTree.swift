@@ -170,6 +170,7 @@ public class EndpointTreeNode
     public func starts_with_regex ( ) -> Bool { return value?.starts_with_regex() ?? false }
     public func has_no_path_info ( ) -> Bool { return value == nil || value!.path.is_empty() }
     
+// MARK: - find      
     func find (  _ route: RouterPath ) -> EndpointTreeNode? 
     {
         if value == nil {
@@ -290,14 +291,14 @@ public class EndpointTreeNode
         
         if value != nil {
             print( pad( ) + "value: ")
-            value!.debug_info( spaces + 2, prefix )
+            value!.debug_info( spaces + 4, prefix )
         } else {
             print( pad( ) + "value: " + (prefix == "" ? "(null)" : prefix) )
         }
 
         if null_node != nil {
             print( pad( ) + "null_node: ")
-            null_node!.debug_info( spaces + 2 )
+            null_node!.debug_info( spaces + 4 )
         }
         else {
             print( pad( ) + "null_node: " + (prefix == "" ? "(null)" : prefix) )
@@ -305,13 +306,13 @@ public class EndpointTreeNode
         
         print( pad( ) + "var_nodes: " + "\(var_nodes.count)" )
         for n in var_nodes {
-            n.debug_info( spaces + 2 )
+            n.debug_info( spaces + 4 )
         }
 
         print( pad( ) + "nodes: " + "\(nodes.count)" )
         for (key,n) in nodes {
             print( pad( ) + "nodes[\(key)]" )
-            n.debug_info( spaces + 2, key )
+            n.debug_info( spaces + 4, key )
         }
        
     }

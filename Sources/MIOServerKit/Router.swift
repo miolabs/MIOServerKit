@@ -74,6 +74,7 @@ open class Router
         }
         
         let ret = Router( )
+        ret.root.is_root = false
         ret.root = node!
         //ret.root.value = EndpointPath( )
         //node!.insert_subnode( ret.root )
