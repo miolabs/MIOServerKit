@@ -7,9 +7,9 @@
 
 import Kitura
 import KituraCORS
-import LoggerAPI
 import Foundation
-//import Fortify
+import MIOCoreLogger
+
 
 public let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
@@ -50,9 +50,8 @@ open class MSKServer<T>: MSKRouter<T> {
         kituraRouter.put(     "*", handler: dispatch( ) )
         kituraRouter.patch(   "*", handler: dispatch( ) )
         kituraRouter.options( "*", handler: dispatch( ) )
-
         
-        Log.verbose("MIORouter initialized")
+        Log.trace("MIORouter initialized")
     }
 
 
@@ -74,11 +73,12 @@ open class MSKServer<T>: MSKRouter<T> {
 //                }
             }
             catch {
-                print( "FATAL ERROR: \(error)" )
+                Log.error( "\(error)" )
                 response.status(.internalServerError)
             }
         } else {
             // TODO: respond: page not found
+            Log.warning( "NOT FOUND: \(method.rawValue) \(path)" )
             response.status(.notFound)
             response.send( data: "NOT FOUND: \(method.rawValue) \(path)".data(using: .utf8)! )
         }
