@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Tester</title>
+</head>
+<body style="background-color:black">
+    <h2 style="color:gray;">WebSocket Client</h2>
+    <input type="text" id="messageInput" placeholder="Type a message" style="color:gray;">
+    <button onclick="sendMessage()">Send Message</button>
+    <div id="output" style="color:gray;"></div>
+
+    <script>
+        const socket = new WebSocket('ws://localhost:8888'); 
+        
+        socket.onopen = () => {
+            logMessage('Connected to WebSocket server');
+        };
+        
+        socket.onmessage = (event) => {
+            logMessage(`Received: ${event.data}`);
+        };
+        
+        socket.onerror = (error) => {
+            logMessage(`Error: ${error.message}`);
+        };
+        
+        socket.onclose = () => {
+            logMessage('Disconnected from WebSocket server');
+        };
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(input.value);
+                logMessage(`Sent: ${input.value}`);
+                input.value = '';
+            } else {
+                logMessage('WebSocket not connected');
+            }
+        }
+        
+        function logMessage(message) {
+            const output = document.getElementById('output');
+            const p = document.createElement('p');
+            p.textContent = message;
+            output.appendChild(p);
+        }
+    </script>
+</body>
+</html>
+
+
+
+<!-- <!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8">
+        console.log("d3 loaded");
+    </script>
+
+  </head>
+  <body style="background-color:black">
+    <script>
+        console.log("d3 loadeddddd");
+        var ws = new WebSocket("ws://localhost:8888");
+        ws.onopen = function() {
+            console.log("Connected");
+            ws.send("Hello, World!");
+        };
+        ws.onmessage = function (evt) {
+            console.log("Received: " + evt.data);
+        };
+        ws.onclose = function() {
+            console.log("Disconnected");
+        };
+    </script>
+    <p style="color:gray;">Body</p>
+ </body>
+</html> -->

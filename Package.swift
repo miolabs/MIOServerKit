@@ -5,7 +5,8 @@ import PackageDescription
 
 let package = Package(
     name: "MIOServerKit",
-    platforms: [.macOS(.v12)],
+    //platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v14)],  // XXXX
     products: [
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library( name: "MIOServerKit", targets: ["MIOServerKit"] ),
@@ -54,6 +55,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOWebSocket", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "MIOCore", package: "MIOCore"),
                 .product(name: "MIOCoreContext", package: "MIOCore"),
