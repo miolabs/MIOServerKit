@@ -52,6 +52,7 @@ class HTTPClient {
         }
         task.resume()
     }
+
     func post(url: String, body: Data?, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
         guard let requestUrl = URL(string: url) else {
             completion(nil, nil, NSError(domain: "Invalid URL", code: -1, userInfo: nil))
