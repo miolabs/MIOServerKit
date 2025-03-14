@@ -6,21 +6,26 @@ import XCTest
 import Foundation
 
 
-class ServerTest01: ConnectedWebSocket {
-    override func OnTextMessageFromClient(_ message: String) {
-        print("ServerTest01:Received message: \(message)")
-        Task.detached {
-            try await self.SendTextToClient("You sent me: \(message)")
-        }
-    }
-}
-
 final class WebSocketServerManualTests: XCTestCase {
 
     func test_Launch_HaltAndCatchFire() async throws {
-        let server = NIOWebSocketServer<ServerTest01>(port:8888 )
+        let routes = Router()
+        routes.endpoint( "/hook").get( httpFuncHandler ).post( httpFuncHandler )
+
+        let wsEndPoint = WebSocketEndpoint("/socket").OnText { message, operations in
+            print("Hello endpoint: \(message)")
+            Task {
+                try await operations.SendTextToCaller("Hello from server. You sent me \(message)")
+            }
+            return
+        }
+
+        let server = NIOWebSocketServer(routes: routes, webSocketEndpoints: [wsEndPoint] )
         print("Websocket server started")
-        try server.runAndWait()
-        print("This line is never reached")  
+        try server.runAndWait(port:8888)
+        print("This line is never reached")
     }
 }
+
+
+

@@ -7,33 +7,51 @@
 </head>
 <body style="background-color:black">
     <h2 style="color:gray;">WebSocket Client</h2>
+    <div>
+        <label style="color:gray;" for="urlInput">WebSocket URL: </label>
+        <input type="text" id="urlInput" size="30" value="ws://localhost:8888/socket">
+        <button onclick="connectWebSocket()">Connect</button>
+    </div>
     <input type="text" id="messageInput" placeholder="Type a message" style="color:gray;">
     <button onclick="sendMessage()">Send Message</button>
     <button onclick="closeSocket()">Close Socket</button>
     <div id="output" style="color:gray;"></div>
 
     <script>
-        const socket = new WebSocket('ws://localhost:8888'); 
-        
-        socket.onopen = () => {
-            logMessage('Connected to WebSocket server');
-        };
-        
-        socket.onmessage = (event) => {
-            logMessage(`Received: ${event.data}`);
-        };
-        
-        socket.onerror = (error) => {
-            logMessage(`Error: ${error.message}`);
-        };
-        
-        socket.onclose = () => {
-            logMessage('Disconnected from WebSocket server');
-        };
-        
+        let socket;
+
+        function connectWebSocket() {
+            const urlInput = document.getElementById('urlInput').value;
+
+            // Check if the URL is valid
+            if (!urlInput) {
+                logMessage('Please enter a valid WebSocket URL.');
+                return;
+            }
+
+            socket = new WebSocket(urlInput);
+
+            socket.onopen = () => {
+                logMessage('Connected to WebSocket server');
+            };
+
+            socket.onmessage = (event) => {
+                logMessage(`Received: ${event.data}`);
+            };
+
+            socket.onerror = (error) => {
+                logMessage(`Error: ${error.message}`);
+            };
+
+            socket.onclose = () => {
+                logMessage('Disconnected from WebSocket server');
+            };
+        }
+
         function sendMessage() {
             const input = document.getElementById('messageInput');
-            if (socket.readyState === WebSocket.OPEN) {
+
+            if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(input.value);
                 logMessage(`Sent: ${input.value}`);
                 input.value = '';

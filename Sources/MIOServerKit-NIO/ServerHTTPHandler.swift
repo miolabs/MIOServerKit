@@ -25,16 +25,19 @@ class ServerHTTPHandler: ChannelInboundHandler
         case sendingResponse
         
         mutating func requestReceived() {
+print("------------requestReceived")            
             precondition(self == .idle, "Invalid state for request received: \(self)")
             self = .waitingForRequestBody
         }
 
         mutating func requestComplete() {
-            precondition(self == .waitingForRequestBody, "Invalid state for request complete: \(self)")
+print("------------requestComplete")            
+            precondition(self == .waitingForRequestBody || self == .idle, "Invalid state for request complete: \(self)")
             self = .sendingResponse
         }
 
         mutating func responseComplete() {
+print("------------responseComplete")
             precondition(self == .sendingResponse, "Invalid state for response complete: \(self)")
             self = .idle
         }
@@ -63,6 +66,7 @@ class ServerHTTPHandler: ChannelInboundHandler
     
     public func dispatchRequest ( ) throws 
     {
+print("------------dispatchRequest  path: \(request.url.relativePath)")        
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request!.method.rawValue )!
@@ -82,6 +86,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
         else
         {
+print("------------404")            
             // TODO: respond: page not found
             response.status(.notFound)
             response.body = "NOT FOUND: \(method.rawValue) \(path)"
@@ -90,6 +95,7 @@ class ServerHTTPHandler: ChannelInboundHandler
 
     open func process( _ endpoint_spec: MethodEndpoint, _ vars: RouterPathVars ) throws 
     {
+    
         try endpoint_spec.run( serverSettings, request, response) { result in
             
             switch result {
@@ -110,6 +116,7 @@ class ServerHTTPHandler: ChannelInboundHandler
     }
            
     private func completeResponse(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {
+print("------------completeResponse  \(ObjectIdentifier(context.channel))")
         self.state.responseComplete()
 
         let promise = self.keepAlive ? promise : (promise ?? context.eventLoop.makePromise())
@@ -122,6 +129,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         
     func channelRead(context: ChannelHandlerContext, data: NIOAny) 
     {
+ print("------------channelRead  \(ObjectIdentifier(context.channel))")       
         let reqPart = self.unwrapInboundIn(data)
         
         switch reqPart {
@@ -193,14 +201,22 @@ class ServerHTTPHandler: ChannelInboundHandler
     }
 
     func channelReadComplete(context: ChannelHandlerContext) {
+print("------------channelReadComplete  \(ObjectIdentifier(context.channel))")                
         context.flush()
     }
 
+    func channelInactive(context: ChannelHandlerContext) {
+print("---------------El canal se ha cerrado  \(ObjectIdentifier(context.channel))")
+        context.fireChannelInactive()
+    }
+
     func handlerAdded(context: ChannelHandlerContext) {
+print("------------handlerAdded  \(ObjectIdentifier(context.channel))")                
         self.buffer = context.channel.allocator.buffer(capacity: 0)
     }
 
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+print("------------userInboundEventTriggered  \(ObjectIdentifier(context.channel))")        
         switch event {
         case let evt as ChannelEvent where evt == ChannelEvent.inputClosed:
             // The remote peer half-closed the channel. At this time, any

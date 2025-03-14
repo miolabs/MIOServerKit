@@ -4,36 +4,36 @@ import NIOPosix
 import NIOHTTP1
 import NIOWebSocket
 
-open class ConnectedWebSocket { 
+open class ConnectedWebSocket : ConnectedWebSocketOperations { 
     var inbound:  NIOAsyncChannelInboundStream<WebSocketFrame>
     var outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>
     var allocator: ByteBufferAllocator
     var id : String = ""
+    var allConnections: ConnectedClientsToEndpoint
 
     required public init(
         _ id : String,
         _ allocator: ByteBufferAllocator, 
         _ inbound: NIOAsyncChannelInboundStream<WebSocketFrame>,
-        _ outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>) {
+        _ outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>,
+        _ allConnections: ConnectedClientsToEndpoint) {
 
         self.id = id
         self.allocator = allocator
         self.inbound = inbound
         self.outbound = outbound
+        self.allConnections = allConnections
     }
 
-    static func New<T: ConnectedWebSocket>(
-    //static func New(
-        //T: ConnectedWebSocket.Type,
-        //T: T,
-        _ type: T.Type, 
-        _ id : String,
-        _ allocator: ByteBufferAllocator,
-        _ inbound: NIOAsyncChannelInboundStream<WebSocketFrame>, 
-        _ outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>) -> T {
+    // static func New<T: ConnectedWebSocket>(
+    //     _ type: T.Type, 
+    //     _ id : String,
+    //     _ allocator: ByteBufferAllocator,
+    //     _ inbound: NIOAsyncChannelInboundStream<WebSocketFrame>, 
+    //     _ outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>) -> T {
 
-        return T(id, allocator, inbound, outbound)
-    }
+    //     return T(id, allocator, inbound, outbound)
+    // }
 
     open func OnFrameFromClientProcessed(_ frame: WebSocketFrame) -> (Bool, Bool) {
         let frameProcessed = false
@@ -43,16 +43,39 @@ open class ConnectedWebSocket {
 
     open func OnTextMessageFromClient(_ message: String) {
         print("Received message: \(message)")
+        let endPoint = allConnections.endPoint
+        if let handler = endPoint.methods[.TEXT] {
+            do {
+                _ = try handler.run(message, self)
+            }
+            catch {
+                
+            }
+        }
     }
 
-    //OnConnected() ??
+    //OnConnected() ?? xxx
 
-    public func SendTextToClient(_ message: String) async throws {
-        var buffer = allocator.buffer(capacity: message.utf8.count)
-        buffer.writeString(message)
+    // public func SendTextToClient(_ message: String) async throws {
+    //     var buffer = allocator.buffer(capacity: message.utf8.count)
+    //     buffer.writeString(message)
+    //     let frame = WebSocketFrame(fin: true, opcode: .text, data: buffer)
+    //     print("Sending message")
+    //     try await outbound.write(frame)
+    // }
+
+    public func SendTextToAll(_ text: String) async throws{
+        // xxx
+    }
+    public func SendTextToCaller(_ text: String) async throws {
+        var buffer = allocator.buffer(capacity: text.utf8.count)
+        buffer.writeString(text)
         let frame = WebSocketFrame(fin: true, opcode: .text, data: buffer)
-        print("Sending message")
+        //print("Sending message")
         try await outbound.write(frame)
+    }
+    public func SendTextToAllButCaller(_ text: String) async throws {
+        
     }
 
     func gotFrame(_ frame: WebSocketFrame) async throws -> Bool {
