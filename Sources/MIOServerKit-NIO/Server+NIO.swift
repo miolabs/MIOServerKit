@@ -22,6 +22,8 @@ open class NIOServer : Server
     let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
     var bootstrap: ServerBootstrap!
+    var channel: Channel!
+    var alreadyRunning = DispatchSemaphore(value: 0)
     
     open override func run ( port:Int )
     {
@@ -42,7 +44,7 @@ open class NIOServer : Server
         
         do {
 //            let channel = try bootstrap.bind( host: "127.0.0.1", port: port ).wait()
-            let channel = try bootstrap.bind( host: "0.0.0.0", port: port ).wait()
+            channel = try bootstrap.bind( host: "0.0.0.0", port: port ).wait()
 
             guard let channelLocalAddress = channel.localAddress else {
                 Log.critical("Address was unable to bind. Please check that the socket was not closed or that the address family was understood.")
@@ -50,7 +52,8 @@ open class NIOServer : Server
             }
                         
             Log.info( "Server started and listening on \(channelLocalAddress)" )
-            // This will never unblock as we don't close the ServerChannel
+            alreadyRunning.signal()
+            // This will never unblock until terminateServer() is called
             try channel.closeFuture.wait()
         } catch {
             Log.critical("\(error)")
@@ -61,6 +64,24 @@ open class NIOServer : Server
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
             channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, settings: self.settings ) )
+        }
+    }
+    
+    public func waitForServerRunning(timeoutSeconds:Int = 5 ) -> Bool {
+        if alreadyRunning.wait(timeout: .now() + .seconds(timeoutSeconds)) == .timedOut {
+            print("Timeout waiting for Server to start.")
+            return false
+        }
+        return true
+    }
+    
+    public func terminateServer() throws {
+        do {
+            try channel?.close().wait()
+            //try group?.syncShutdownGracefully()
+            print("Server terminated.")
+        } catch {
+            print("Error terminating server: \(error)")
         }
     }
 }
