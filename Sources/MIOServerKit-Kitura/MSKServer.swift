@@ -54,8 +54,6 @@ open class MSKServer<T>: MSKRouter<T> {
         Log.trace("MIORouter initialized")
     }
 
-
- 
     public func dispatchRequest ( _ request: MSKRouterRequest, _ response: MSKRouterResponse ) throws {
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
@@ -89,6 +87,7 @@ open class MSKServer<T>: MSKRouter<T> {
     public func run ( port:Int ) {
         Kitura.addHTTPServer( onPort: port, with: kituraRouter )
 //        server.options = ServerOptions(requestSizeLimit: nil, connectionLimit: nil)
+        Log.info( "Starting server at port: \(port)" )
         Kitura.run( )
     }
 }
