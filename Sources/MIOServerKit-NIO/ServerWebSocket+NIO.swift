@@ -93,7 +93,7 @@ open class NIOWebSocketServer : Server {
         try? runAndWait(port: port)
     }
 
-    public func runAndWait(port:Int ) throws {
+    private func runAndWait(port:Int ) throws {
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached {
             try await self.actualRun(port: port)
@@ -102,9 +102,9 @@ open class NIOWebSocketServer : Server {
         semaphore.wait()
     }
 
-    public func runAsync(port: Int) async throws {
-        try await actualRun(port: port)
-    }
+    // public func runAsync(port: Int) async throws {
+    //     try await actualRun(port: port)
+    // }
 /*
      func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         //channel.eventLoop.makeCompletedFuture {
@@ -155,13 +155,13 @@ open class NIOWebSocketServer : Server {
             channel.eventLoop.makeCompletedFuture {
                 print("En Make Completed Future")
                 let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
-                    shouldUpgrade: { (channel, head) in
+                    shouldUpgrade: { channel, head in
                         // HTTPRequestHead
                         //print("shouldUgrade \(head.uri)")
                         channel.eventLoop.makeSucceededFuture(HTTPHeaders())
                         //channel.eventLoop.makeFailedFuture(NSError(domain:"com.m", code:100, userInfo: ["error":"shouldUpgrade"]))
                     },
-                    upgradePipelineHandler: { (channel, head) in
+                    upgradePipelineHandler: { channel, head in
                         channel.eventLoop.makeCompletedFuture {
                             let asyncChannel = try NIOAsyncChannel<WebSocketFrame, WebSocketFrame>(wrappingChannelSynchronously: channel)
                             return UpgradeResult.websocket(WebSocketChannelWithURI(asyncChannel, head.uri))
@@ -266,7 +266,9 @@ open class NIOWebSocketServer : Server {
                 let newClientId = UUID().uuidString
                 //let newClient = ConnectedWebSocket.New(ConnectedWebSocket.self, newClientId, channel.channel.channel.allocator, inbound, outbound)
                 let newClient = webSocketClients.AddClient(channel.uri, newClientId, channel.channel.channel.allocator, inbound, outbound)
+                print("handlewebsocket ---- 1")
                 if newClient != nil {
+                    print("handlewebsocket ---- 2")
                     group.addTask {
                         for try await frame in inbound {
                             let closeConnection = try await newClient!.gotFrame(frame)
@@ -276,10 +278,12 @@ open class NIOWebSocketServer : Server {
                         }
                     }
                     try await group.next() 
+                    print("handlewebsocket ---- 3")
                     group.cancelAll()  
                     //self.clients[newClientId] = nil  // xxx
                     webSocketClients.RemoveClient(channel.uri, newClientId)
                 }   
+                print("handlewebsocket ---- 4")
             }
         }
     }

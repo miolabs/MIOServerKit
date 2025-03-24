@@ -12,7 +12,7 @@ public enum WebSocketEndpointFrameType: String
 }
 
 
-public typealias WebSocketEndpointRequestDispatcher = (String, ConnectedWebSocketOperations) throws -> Any? 
+public typealias WebSocketEndpointRequestDispatcher = (String, ConnectedWebSocketOperations) async throws -> Void
 
 public struct WebSocketEndpointMethodHandler
 {
@@ -24,10 +24,10 @@ public struct WebSocketEndpointMethodHandler
         self.cb = cb
     }
     
-    public func run(_ message: String, _ operations: ConnectedWebSocketOperations) throws
+    public func run(_ message: String, _ operations: ConnectedWebSocketOperations) async throws
     {
         if cb != nil {
-            _ = try cb!(message, operations)
+            _ = try await cb!(message, operations)
         }
     }
 }
@@ -52,9 +52,8 @@ public class WebSocketEndpoint {
 }
 
 public typealias ConnectedClientID = String
-public typealias EndpointURI = String
-//public typealias ConnectedClientsToEndpoint = [ConnectedClientID: ConnectedWebSocket]
 
+//public typealias ConnectedClientsToEndpoint = [ConnectedClientID: ConnectedWebSocket]
 public protocol ConnectedWebSocketOperations {
     func SendTextToAll(_ text: String) async throws
     func SendTextToCaller(_ text: String) async throws
@@ -69,32 +68,54 @@ public class ConnectedClientsToEndpoint  {
         self.endPoint = endPoint
     }
 
-    public func SendTextToAll() {
-        // xxx
-    }
-    public func SendTextToCaller() {
-        // xxx
-    }
-    public func SendTextToAllButCaller() {
-        // xxx
-    }
+    // public func SendTextToAll() {
+    //     // xxx
+    // }
+    // public func SendTextToCaller() {
+    //     // xxx
+    // }
+    // public func SendTextToAllButCaller() {
+    //     // xxx
+    // }
 
     public func AddClient( _ clientId: ConnectedClientID, _ client: ConnectedWebSocket ) {
         clients[clientId] = client
     }
 }
 
+public typealias EndpointURI = String
 public class ConnectedWebSocketCatalog {
 
     private var webSockets: [EndpointURI: ConnectedClientsToEndpoint] = [:]
+    private let webSocketsLock = NSLock()
     //private var endPoints: [WebSocketEndpoint] = []
 
     public func AddEndpoints( _ endPoints: [WebSocketEndpoint] ) {
-        //self.endPoints = endPoints
+        webSocketsLock.lock()
+        defer { webSocketsLock.unlock() } 
         for ep in endPoints {
             webSockets[ep.uri] = ConnectedClientsToEndpoint(ep)
         }
     }
+
+    public func SendTextToAll(_ serverUri: String, _ text: String) async throws{
+        webSocketsLock.lock()
+        defer { webSocketsLock.unlock() } 
+        if let cc = webSockets[serverUri] {
+            for (_, connection) in cc.clients {
+                try await connection.SendTextToClient(text)
+            }
+        }
+    }
+
+    public func ConnectedClientsCount(_ serverUri: String) -> Int {
+        webSocketsLock.lock()
+        defer { webSocketsLock.unlock() } 
+        if let cc = webSockets[serverUri] {
+            return cc.clients.count
+        }
+        return 0
+    }   
 
     public func AddClient(
         _ uri: String, 
@@ -103,10 +124,8 @@ public class ConnectedWebSocketCatalog {
         _ inbound: NIOAsyncChannelInboundStream<WebSocketFrame>, 
         _ outbound: NIOAsyncChannelOutboundWriter<WebSocketFrame>) -> ConnectedWebSocket? {
 
-        // if webSockets[uri] == nil {
-        //     return nil
-        // }
-        //if let endPoint = endPoints.first(where: { $0.uri == uri }) {
+        webSocketsLock.lock()
+        defer { webSocketsLock.unlock() } 
         if let cc = webSockets[uri] {
             //let client = ConnectedWebSocket.New(ConnectedWebSocket.self, newClientId, allocator, inbound, outbound, endPoint)
             let clientSocket = ConnectedWebSocket(newClientId, allocator, inbound, outbound, cc)
@@ -118,6 +137,8 @@ public class ConnectedWebSocketCatalog {
     }
 
     public func RemoveClient( _ uri: String, _ clientId: String ) {
+        webSocketsLock.lock()
+        defer { webSocketsLock.unlock() } 
         if webSockets[uri] != nil {
             _ = webSockets[uri]!.clients.removeValue(forKey: clientId)
         }

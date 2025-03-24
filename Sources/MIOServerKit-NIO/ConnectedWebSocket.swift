@@ -41,12 +41,12 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
         return (frameProcessed, closeConnection)
     }
 
-    open func OnTextMessageFromClient(_ message: String) {
+    open func OnTextMessageFromClient(_ message: String) async {
         print("Received message: \(message)")
         let endPoint = allConnections.endPoint
         if let handler = endPoint.methods[.TEXT] {
             do {
-                _ = try handler.run(message, self)
+                _ = try await handler.run(message, self)
             }
             catch {
                 
@@ -56,26 +56,29 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
 
     //OnConnected() ?? xxx
 
-    // public func SendTextToClient(_ message: String) async throws {
-    //     var buffer = allocator.buffer(capacity: message.utf8.count)
-    //     buffer.writeString(message)
-    //     let frame = WebSocketFrame(fin: true, opcode: .text, data: buffer)
-    //     print("Sending message")
-    //     try await outbound.write(frame)
-    // }
-
-    public func SendTextToAll(_ text: String) async throws{
-        // xxx
-    }
-    public func SendTextToCaller(_ text: String) async throws {
+    public func SendTextToClient(_ text: String) async throws {
         var buffer = allocator.buffer(capacity: text.utf8.count)
         buffer.writeString(text)
         let frame = WebSocketFrame(fin: true, opcode: .text, data: buffer)
         //print("Sending message")
         try await outbound.write(frame)
     }
+
+    public func SendTextToAll(_ text: String) async throws{
+        for (_, connection) in allConnections.clients {
+            try await connection.SendTextToClient(text)
+        }
+    }
+    public func SendTextToCaller(_ text: String) async throws {
+        try await SendTextToClient(text)    
+    }
+
     public func SendTextToAllButCaller(_ text: String) async throws {
-        
+        for (_, connection) in allConnections.clients {
+            if connection.id != self.id {
+                try await connection.SendTextToClient(text)
+            }
+        }
     }
 
     func gotFrame(_ frame: WebSocketFrame) async throws -> Bool {
@@ -90,7 +93,7 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
                     }
                     // let bytes = frameData.readableBytesView
                     // print("unmasked bytes: \(Array(bytes))")
-                    self.OnTextMessageFromClient(frameData.getString(at: 0, length: frameData.readableBytes) ?? "")
+                    await self.OnTextMessageFromClient(frameData.getString(at: 0, length: frameData.readableBytes) ?? "")
                 case .ping:
                     var frameData = frame.data
                     let maskingKey = frame.maskKey

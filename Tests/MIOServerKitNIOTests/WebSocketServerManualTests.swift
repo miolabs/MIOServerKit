@@ -22,7 +22,7 @@ final class WebSocketServerManualTests: XCTestCase {
 
         let server = NIOWebSocketServer(routes: routes, webSocketEndpoints: [wsEndPoint] )
         print("Websocket server started")
-        try server.runAndWait(port:8888)
+        server.run(port:8888)
         print("This line is never reached")
     }
 }

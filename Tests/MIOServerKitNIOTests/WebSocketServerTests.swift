@@ -10,59 +10,57 @@ import MIOServerKit_NIO
 import XCTest
 import Foundation
 
-/*
-func openAndConsumeWebSocketConnection(_ notifyRunning: DispatchSemaphore) async {
-    let url = URL(string: "ws://localhost:8888")!
-
+// MARK: - client behavior
+func connectToServerAndRead(_ serverUrl: String, _ messageToRead: String,  onReady: @escaping () -> Void) async {
+    let url = URL(string: serverUrl)!
     let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
-    //let connection: WebSocketConnection<IncomingMessage, OutgoingMessage> = webSocketConnectionFactory.open(at: url)
     let connection: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: url)
-
-    //self.connection = connection
-
     do {
-        print("openAndConsumeWebSocketConnection")
-        // Start consuming IncomingMessages
-        notifyRunning.signal()
-        for try await message in connection.receive() {
-            print("Received message in client:", message)
-        }
-
-        print("IncomingMessage stream ended")
-    } catch {
-        print("Error receiving messages:", error)
-    }
-}
-*/
-func openAndConsumeWebSocketConnection(onReady: @escaping () -> Void) async {
-    let url = URL(string: "ws://localhost:8888")!
-
-    let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
-    //let connection: WebSocketConnection<IncomingMessage, OutgoingMessage> = webSocketConnectionFactory.open(at: url)
-    let connection: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: url)
-
-    do {
-        print("openAndConsumeWebSocketConnection")
-        // Start consuming IncomingMessages
         onReady()
         for try await message in connection.receive() {
-            print("Received message in client:", message)
+            XCTAssertEqual(message, messageToRead)
+            connection.close()
         }
-
-        print("IncomingMessage stream ended")
     } catch {
-        print("Error receiving messages:", error)
+       XCTFail("unexpected exception: \(error)")
+    }
+}
+
+func connectToServerAndWrite(_ serverUrl: String, _ messageToSend: String) async {
+    let url = URL(string: serverUrl)!
+    let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
+    let connection: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: url)
+
+    do {
+        try await connection.send(messageToSend)
+        connection.close()
+    } catch {
+        XCTFail("unexpected exception: \(error)")
+    }
+}
+
+func connectToServerWriteAndRead(_ serverUrl: String, _ messageToSend: String, _ messageToRead: String) async {
+    let url = URL(string: serverUrl)!
+    let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
+    let connection: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: url)
+
+    do {
+        try await connection.send(messageToSend)
+        for try await message in connection.receive() {
+            XCTAssertEqual(message, messageToRead)
+            connection.close()
+         }
+    } catch {
+        XCTFail("unexpected exception: \(error)")
     }
 }
 
 // MARK: - Launch Server
-//func launchServer() async throws -> (NIOWebSocketServer<ConnectedWebSocket>) {
-    //let server = NIOWebSocketServer<ConnectedWebSocket>(routes: Router() )
-func launchServer() async throws -> (NIOWebSocketServer) {
-    let server = NIOWebSocketServer(routes: Router() )
+func launchServer(routes: Router = Router(), webSocketEndpoints: [WebSocketEndpoint] = []) async throws -> NIOWebSocketServer {
+    let server = NIOWebSocketServer(routes: Router(), webSocketEndpoints: webSocketEndpoints )
     Task {
         do {
-            try server.runAndWait(port:8888)
+            try server.run(port:8888)
         } catch {
              print("Error ejecutando el servidor: \(error)")
         }
@@ -83,84 +81,63 @@ final class WebSocketServerTests: XCTestCase {
         try server.terminateServer()
     }
 
-    func test_WebSocketEndpoint() async throws {
-        let wsEndPoint = WebSocketEndpoint("/socket").OnText { message, operations in
-            print("Hello endpoint: \(message)")
+    func test_ClientSendsString_01() async throws {
+        let wsEndPoint = WebSocketEndpoint("/socket").OnText { message, _ in
+            XCTAssertEqual(message, "Hello server")
         }
-        let server = NIOWebSocketServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
-        // Task {
-        //     do {
-        //         try server.runAndWait(port:8888)
-        //     } catch {
-        //         print("Error ejecutando el servidor: \(error)")
-        //     }
-        // }
-        // let serverOk = server.waitForServerRunning()
-        // XCTAssertTrue(serverOk)
+        let server = try await launchServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
 
-        try server.runAndWait(port:8888)
-        ////usleep(2 * 1000000) // seconds
-        print("Test:  Server started")
-
+        let clientTask = Task.detached {
+            await connectToServerAndWrite("ws://localhost:8888/socket", "Hello server")
+        }
+        _ = await clientTask.result
+        
         try server.terminateServer()
+        usleep(2 * 1000000)
     }
 
+    func test_ServerSendsString_01() async throws {
+        let wsEndPoint = WebSocketEndpoint("/socket")
 
-    // func test_WithClient() async throws {
-    //     let server = try await launchServer()
+        let server = try await launchServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
 
-    //     let waitClient = DispatchSemaphore(value: 0)
-    //     var webSocketConnectionTask = Task.detached {
-    //         print("openAndConsumeWebSocketConnection in test 1")
-    //         await openAndConsumeWebSocketConnection(waitClient)
-    //         print("openAndConsumeWebSocketConnection in test 2")
-    //         //waitClient.signal()
-    //     }
-    //     waitClient.wait()
-    //     _ = await webSocketConnectionTask.result
-    //     print("Waiting for webSocketConnectionTask")
-    //     webSocketConnectionTask.cancel()
-    //     print("webSocketConnectionTask cancelled")
-    //     try server.terminateServer()
-    // }
-
-    func test_WithClient02() async throws {
-        let server = try await launchServer()
-
-        // let waitClient = DispatchSemaphore(value: 0)
-        // let webSocketConnectionTask = Task.detached {
-        //     print("openAndConsumeWebSocketConnection in test 1")
-        //     await openAndConsumeWebSocketConnection(waitClient)
-        //     print("openAndConsumeWebSocketConnection in test 2")
-        //     //waitClient.signal()
-        // }
-        // waitClient.wait()
-        var webSocketConnectionTask: Task<Void, Never>? = nil
+        var clientTask: Task<Void, Never>? = nil
         await withCheckedContinuation { continuation in
-            webSocketConnectionTask = Task.detached {
-                print("openAndConsumeWebSocketConnection in test 1")
-                await openAndConsumeWebSocketConnection {
-                    continuation.resume()
+            clientTask = Task.detached {
+                let textToRead = "Hello client"
+                await connectToServerAndRead("ws://localhost:8888/socket", textToRead ) {
+                   continuation.resume()
                 }
-                print("openAndConsumeWebSocketConnection in test 2")
-                //waitClient.signal()
             }
         }
- 
-
-        print("not sending text to clients in test")
-        usleep(useconds_t(2 * 1000000)) // seconds
-        //for cc in server.clients.values {
-        //    try await cc.SendTextToClient("Hello client")
-        //}
-        print("sent text to clients in test")
-
-        _ = await webSocketConnectionTask?.result
-        print("Waiting for webSocketConnectionTask")
-        webSocketConnectionTask?.cancel()
-        print("webSocketConnectionTask cancelled")
+        while server.webSocketClients.ConnectedClientsCount("/socket") == 0 { usleep(100000) } // 0.1 seconds 
+        try await server.webSocketClients.SendTextToAll("/socket", "Hello client")
+        _ = await clientTask?.result
         try server.terminateServer()
+        usleep(useconds_t(2 * 1000000)) // seconds
     }
+
+    func test_ClientSendsStringServerAnswer_01() async throws {
+        let clientMessage = "Hello server"
+        let serverAnswer = "Hello client, I'm the server"
+        let wsEndPoint = WebSocketEndpoint("/socket").OnText { message, operations in
+            XCTAssertEqual(message, clientMessage)
+            try await operations.SendTextToCaller(serverAnswer)
+        }
+        let server = try await launchServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
+
+        let clientTask = Task.detached {
+            await connectToServerWriteAndRead("ws://localhost:8888/socket", clientMessage, serverAnswer)
+        }
+        _ = await clientTask.result
+        
+        try server.terminateServer()
+        usleep(2 * 1000000)
+    }
+
+
+   
+
 
  
 }

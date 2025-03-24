@@ -126,12 +126,18 @@ public final class WebSocketConnection<Incoming: Decodable & Sendable, Outgoing:
 
 extension WebSocketConnection {
     func send(_ message: Outgoing) async throws {
-        guard let messageData = try? encoder.encode(message) else {
-            throw WebSocketConnectionError.encodingError
-        }
-
         do {
-            try await webSocketTask.send(.data(messageData))
+            if Outgoing.self == String.self {
+                guard let stringValue = message as? String else {
+                    return 
+                }
+                try await webSocketTask.send(.string(stringValue))
+            } else {
+                guard let messageData = try? encoder.encode(message) else {
+                    throw WebSocketConnectionError.encodingError
+                }
+                try await webSocketTask.send(.data(messageData))
+            }
         } catch {
             switch webSocketTask.closeCode {
                 case .invalid:
