@@ -1,7 +1,7 @@
 //
 //  MIOServerKitNIOTests.swift
 //  
-//  Tests to issue actual calls to real NIO servers and validate that the Router class works
+//  Tests to perform actual calls to real NIO servers and validate that the Router class works
 //
 //  Created by Manuel Escribano on 4/3/25.
 //
@@ -181,6 +181,11 @@ func launchServerHttp(_ routes:Router) -> (NIOServer, Router) {
 }
 
 final class MIOServerKitNIOTests: XCTestCase {
+    override func tearDown() {
+        super.tearDown()
+        print("tearDown after test")
+    }
+
 // MARK: - Replace hndlr
     func testReplaceURLs() throws {
         let routes = Router()
@@ -201,6 +206,7 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook", "Str2"), 200)
 
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
 // MARK: - Root      
@@ -222,6 +228,7 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/hook/"), 404)
        
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
     func testRootPaths02() throws {
@@ -241,89 +248,120 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/healthz/version/debug"), 200)
        
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 // MARK: - 1 subrouter
     func testOneSubrouterPaths01() throws {
         let urls: [String: [String]] = [
-            "/ringr": ["/ready", "/bookings/business-info", "/bookings/update"],
+            "/svc": ["/ready", "/bookings/business-info", "/bookings/update"],
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update/"), 200)
            
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
-    func testOneSubrouterPaths02() throws {
+    func testOneSubrouterPaths04() throws {
         let urls: [String: [String]] = [
-            "/ringr": ["/bookings/business-info", "/bookings/update", "/ready", "/bookings"],
+            "/svc": ["/bookings/business-info", "/bookings/update", "/ready", "/bookings"],
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update/"), 200)
 
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready"), 404)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready"), 404)
            
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
     func testOneSubrouterPaths03() throws {
         let routes = Router()
-        let ringr_routes = routes.router( "/ringr" )
-        ringr_routes.endpoint( "/bookings/business/update").get( httpFuncHandler )
-        let readyEP = ringr_routes.endpoint( "/ready").get( httpFuncHandler )
-        //ringr_routes.endpoint( "/ready").post( httpFuncHandler )
-        readyEP.post( httpFuncHandler )
-        ringr_routes.endpoint( "/ready/go").post( httpFuncHandler )
-        let bookingsEP = ringr_routes.endpoint( "/bookings").get( httpFuncHandler )
-        ringr_routes.endpoint( "/bookings/business").get( httpFuncHandler )
-        //ringr_routes.endpoint( "/bookings").post( httpFuncHandler )
-        bookingsEP.post( httpFuncHandler )
+        let svc_routes = routes.router( "/svc" )
+        svc_routes.endpoint( "/bookings/business/update").get( httpFuncHandler )
+        // let readyEP = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        // readyEP.post( httpFuncHandler )
+        // svc_routes.endpoint( "/ready/go").post( httpFuncHandler )
+        // let bookingsEP = svc_routes.endpoint( "/bookings").get( httpFuncHandler )
+        // svc_routes.endpoint( "/bookings/business").get( httpFuncHandler )
+        // bookingsEP.post( httpFuncHandler )
+        svc_routes.endpoint( "/ready").get( httpFuncHandler ).post( httpFuncHandler )
+        svc_routes.endpoint( "/ready/go").post( httpFuncHandler )
+        svc_routes.endpoint( "/bookings").get( httpFuncHandler ).post( httpFuncHandler )
+        svc_routes.endpoint( "/bookings/business").get( httpFuncHandler )
 
         let (server, _) = launchServerHttp(routes)
 
         routes.root.debug_info()
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business/update/"), 200)
 
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready/go"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready/go/"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/bookings"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/bookings/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready/go"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready/go/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/bookings"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/bookings/"), 200)
            
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
+    }
+
+     func testOneSubrouterPaths02() throws {
+        let routes = Router()
+        let svc_routes = routes.router( "/svc" )
+        svc_routes.endpoint( "/bookings/business/update").get( httpFuncHandler )
+        let readyEP = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        readyEP.post( httpFuncHandler )
+        svc_routes.endpoint( "/ready/go").post( httpFuncHandler )
+        let bookingsEP = svc_routes.endpoint( "/bookings").get( httpFuncHandler )
+        svc_routes.endpoint( "/bookings/business").get( httpFuncHandler )
+        bookingsEP.post( httpFuncHandler )
+        
+        let (server, _) = launchServerHttp(routes)
+
+        //routes.root.debug_info()
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready/go"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/ready/go/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/bookings"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/svc/bookings/"), 200)
+           
+        try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
 // MARK: - root subrouters
     func testRootAndSubrouterPaths() throws {
         let urls: [String: [String]] = [
             "/": ["/", "/version"],
-            "/ringr": ["/ready", "/bookings/business-info", "/bookings/update"],
+            "/svc": ["/ready", "/bookings/business-info", "/bookings/update"],
         ]
         let (server, router) = launchServerHttp(urls)
         
@@ -332,22 +370,23 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version/"), 200)
   
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update/"), 200)
         
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
     func testRootAndTwoSubroutersPaths() throws {
         let urls: [String: [String]] = [
             "/": ["/", "/version"],
-            "/ringr": ["/ready", "/bookings/business-info", "/bookings/update"],
+            "/svc": ["/ready", "/bookings/business-info", "/bookings/update"],
             "/more": ["/ready", "/another/update"],
         ]
         let (server, _) = launchServerHttp(urls)
@@ -357,42 +396,44 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version/"), 200)
   
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update/"), 200)
 
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/ready/"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/another/update"), 200)
         
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
 // MARK: - 2 subrouters
     func testRootTwoRoutersPaths() throws {
          let urls: [String: [String]] = [
-            "/ringr": ["/ready", "/bookings/business-info", "/bookings/update"],
+            "/svc": ["/ready", "/bookings/business-info", "/bookings/update"],
             "/more": ["/ready", "/another/update"],
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/svc/bookings/update/"), 200)
 
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/ready/"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/another/update"), 200)
         
         try server.terminateServer()
+ //usleep(useconds_t(2 * 1000000)) // seconds
     }
 
 }

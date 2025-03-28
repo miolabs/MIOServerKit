@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "MIOServerKit",
     //platforms: [.macOS(.v12)],
-    platforms: [.macOS(.v14)],  // XXXX
+    platforms: [.macOS(.v14)],  
     products: [
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library( name: "MIOServerKit", targets: ["MIOServerKit"] ),

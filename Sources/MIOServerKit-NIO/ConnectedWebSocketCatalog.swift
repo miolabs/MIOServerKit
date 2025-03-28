@@ -68,16 +68,6 @@ public class ConnectedClientsToEndpoint  {
         self.endPoint = endPoint
     }
 
-    // public func SendTextToAll() {
-    //     // xxx
-    // }
-    // public func SendTextToCaller() {
-    //     // xxx
-    // }
-    // public func SendTextToAllButCaller() {
-    //     // xxx
-    // }
-
     public func AddClient( _ clientId: ConnectedClientID, _ client: ConnectedWebSocket ) {
         clients[clientId] = client
     }
@@ -97,6 +87,15 @@ public class ConnectedWebSocketCatalog {
             webSockets[ep.uri] = ConnectedClientsToEndpoint(ep)
         }
     }
+
+     public func ContainsEndpoint(_ endpointUri: String) -> Bool {
+        webSocketsLock.lock()
+        defer { webSocketsLock.unlock() } 
+        if let cc = webSockets[endpointUri] {
+            return true
+        }
+        return false
+     }
 
     public func SendTextToAll(_ serverUri: String, _ text: String) async throws{
         webSocketsLock.lock()

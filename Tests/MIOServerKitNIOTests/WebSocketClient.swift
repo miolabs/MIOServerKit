@@ -1,3 +1,9 @@
+/*
+
+WebSocketClient implementation for testing the server 
+
+*/
+
 import NIOCore
 import NIOPosix
 import NIOHTTP1
@@ -72,6 +78,23 @@ public final class WebSocketConnection<Incoming: Decodable & Sendable, Outgoing:
         super.init()
         webSocketTask.resume()
     }
+/*
+
+let url = URL(string: "wss://tu-servidor.com/socket")!
+let task = URLSession(configuration: .default).webSocketTask(with: url)
+task.resume()
+
+// Esperamos un segundo para darle oportunidad de conectar 
+DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+    task.sendPing { error in
+        if let error = error {
+            print("❌ No conectado: \(error.localizedDescription)")
+        } else {
+            print("✅ Conectado al WebSocket")
+        }
+    }
+}
+*/
 
     deinit {
         webSocketTask.cancel(with: .goingAway, reason: nil) // Make sure to cancel the WebSocketTask (if not already canceled or completed)

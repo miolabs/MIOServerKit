@@ -66,7 +66,7 @@ print("------------responseComplete")
     
     public func dispatchRequest ( ) throws 
     {
-print("------------dispatchRequest  path: \(request.url.relativePath)")        
+print("------------dispatchRequest  path: \(request.url.relativePath), method: \(request.method.rawValue)")        
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request!.method.rawValue )!
@@ -74,7 +74,6 @@ print("------------dispatchRequest  path: \(request.url.relativePath)")
         let endpoint = router.root.match( method == .HEAD ? EndpointMethod.GET : method
                                  , RouterPath( path )
                                  , &route_vars )
-
         if endpoint != nil && endpoint!.methods[ method ] != nil
         {
             if method == .HEAD { response.status(.ok); return }
@@ -159,23 +158,25 @@ print("------------completeResponse  \(ObjectIdentifier(context.channel))")
             do {
                 self.buffer.clear()
                 
-                request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
-                try dispatchRequest( )
-                
-                var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response!.status )
-                
-                for (k, v) in response!.headers {
-                    responseHead.headers.add( name: k, value: v )
+                if request != nil && response != nil {
+                    request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
+                    try dispatchRequest( )
+                    
+                    var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response!.status )
+                    
+                    for (k, v) in response!.headers {
+                        responseHead.headers.add( name: k, value: v )
+                    }
+                    
+                    // Update Content Length header
+                    responseHead.headers.add(name: "content-length", value: "\(self.buffer!.readableBytes)")
+                                    
+                    let head = HTTPServerResponsePart.head( responseHead )
+                    context.write(self.wrapOutboundOut( head ), promise: nil)
+                    
+                    let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
+                    context.write(self.wrapOutboundOut(content), promise: nil)
                 }
-                
-                // Update Content Length header
-                responseHead.headers.add(name: "content-length", value: "\(self.buffer!.readableBytes)")
-                                 
-                let head = HTTPServerResponsePart.head( responseHead )
-                context.write(self.wrapOutboundOut( head ), promise: nil)
-                
-                let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
-                context.write(self.wrapOutboundOut(content), promise: nil)
             }
             catch 
             {

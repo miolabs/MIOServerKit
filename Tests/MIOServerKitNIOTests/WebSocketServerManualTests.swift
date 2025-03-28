@@ -1,10 +1,14 @@
+/*
 
+Test to just load the server and interact with it manually (see WebSocketClient.html)
+This is not a test that can be run automatically because it never returns
+
+*/
 
 import MIOServerKit
 import MIOServerKit_NIO
 import XCTest
 import Foundation
-
 
 final class WebSocketServerManualTests: XCTestCase {
 

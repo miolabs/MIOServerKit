@@ -42,7 +42,7 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
     }
 
     open func OnTextMessageFromClient(_ message: String) async {
-        print("Received message: \(message)")
+        //print("Received message: \(message)")
         let endPoint = allConnections.endPoint
         if let handler = endPoint.methods[.TEXT] {
             do {
@@ -53,8 +53,6 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
             }
         }
     }
-
-    //OnConnected() ?? xxx
 
     public func SendTextToClient(_ text: String) async throws {
         var buffer = allocator.buffer(capacity: text.utf8.count)
@@ -104,7 +102,7 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
                     let responseFrame = WebSocketFrame(fin: true, opcode: .pong, data: frameData)
                     try await outbound.write(responseFrame)
                 case .connectionClose:
-                    print("Received close")
+                    //print("Received close")
                     var data = frame.unmaskedData
                     let closeDataCode = data.readSlice(length: 2) ?? ByteBuffer()
                     let closeFrame = WebSocketFrame(fin: true, opcode: .connectionClose, data: closeDataCode)

@@ -23,9 +23,9 @@ final class NodeTreeStructTests: XCTestCase {
         let route_1 = routes.endpoint( "/").get( httpFuncHandler )
         let route_2 = routes.endpoint( "/hook").get( httpFuncHandler )
 
-        let ringr_routes = routes.router( "/ringr" )
-        let route_r1 = ringr_routes.endpoint( "/ready").get( httpFuncHandler )
-        let route_r2 = ringr_routes.endpoint( "/bookings/update").get( httpFuncHandler )
+        let svc_routes = routes.router( "/svc" )
+        let route_r1 = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        let route_r2 = svc_routes.endpoint( "/bookings/update").get( httpFuncHandler )
 
         routes.root.debug_info( )
     }

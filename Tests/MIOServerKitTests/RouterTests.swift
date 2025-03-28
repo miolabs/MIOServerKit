@@ -119,15 +119,15 @@ final class RouterTests: XCTestCase {
     func testRouterOneSubrouter ( ) {
         let routes = Router()
         
-        let ringr_routes = routes.router( "/ringr" )
-        let route_r = ringr_routes.endpoint( "/ready").get( httpFuncHandler )
-        let route_1 = ringr_routes.endpoint( "/bookings/business").get( httpFuncHandler )
-        let route_2 = ringr_routes.endpoint( "/bookings/update").get( httpFuncHandler )
+        let svc_routes = routes.router( "/svc" )
+        let route_r = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        let route_1 = svc_routes.endpoint( "/bookings/business").get( httpFuncHandler )
+        let route_2 = svc_routes.endpoint( "/bookings/update").get( httpFuncHandler )
         
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/ready"            ), &route_vars ) === route_r )
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/bookings/business"), &route_vars ) === route_1 )
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/bookings/update"  ), &route_vars ) === route_2 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/ready"            ), &route_vars ) === route_r )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/bookings/business"), &route_vars ) === route_1 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/bookings/update"  ), &route_vars ) === route_2 )
 
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ready"            ), &route_vars ) !== route_r )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/bookings/business"), &route_vars ) !== route_1 )
@@ -140,17 +140,17 @@ final class RouterTests: XCTestCase {
         let route_1 = routes.endpoint( "/").get( httpFuncHandler )
         let route_2 = routes.endpoint( "/hook").get( httpFuncHandler )
 
-        let ringr_routes = routes.router( "/ringr" )
-        let route_r1 = ringr_routes.endpoint( "/ready").get( httpFuncHandler )
-        let route_r2 = ringr_routes.endpoint( "/bookings/update").get( httpFuncHandler )
+        let svc_routes = routes.router( "/svc" )
+        let route_r1 = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        let route_r2 = svc_routes.endpoint( "/bookings/update").get( httpFuncHandler )
          
         var route_vars: RouterPathVars = [:]
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/"              ), &route_vars ) === route_1 )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_2 )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/hook/"         ), &route_vars ) === route_2 )
 
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/ready"            ), &route_vars ) === route_r1 )
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/bookings/update"  ), &route_vars ) === route_r2 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/ready"            ), &route_vars ) === route_r1 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/bookings/update"  ), &route_vars ) === route_r2 )
      }
 
 // MARK: - root 2 subrouter 
@@ -160,9 +160,9 @@ final class RouterTests: XCTestCase {
         let route_1 = routes.endpoint( "/").get( httpFuncHandler )
         let route_2 = routes.endpoint( "/hook").get( httpFuncHandler )
 
-        let ringr_routes = routes.router( "/ringr" )
-        let route_r1 = ringr_routes.endpoint( "/ready").get( httpFuncHandler )
-        let route_r2 = ringr_routes.endpoint( "/bookings/update").get( httpFuncHandler )
+        let svc_routes = routes.router( "/svc" )
+        let route_r1 = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        let route_r2 = svc_routes.endpoint( "/bookings/update").get( httpFuncHandler )
 
         let more_routes = routes.router( "/more" )
         let route_m1 = more_routes.endpoint( "/ready").get( httpFuncHandler )
@@ -173,8 +173,8 @@ final class RouterTests: XCTestCase {
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_2 )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/hook/"         ), &route_vars ) === route_2 )
 
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/ready"            ), &route_vars ) === route_r1 )
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/bookings/update"  ), &route_vars ) === route_r2 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/ready"            ), &route_vars ) === route_r1 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/bookings/update"  ), &route_vars ) === route_r2 )
 
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/more/ready"       ), &route_vars ) === route_m1 )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/more/another/info"), &route_vars ) === route_m2 )
@@ -184,9 +184,9 @@ final class RouterTests: XCTestCase {
     func testRouterTwoSubRouter ( ) {
        let routes = Router()
         
-        let ringr_routes = routes.router( "/ringr" )
-        let route_r = ringr_routes.endpoint( "/ready").get( httpFuncHandler )
-        let route_1 = ringr_routes.endpoint( "/bookings/business").get( httpFuncHandler )
+        let svc_routes = routes.router( "/svc" )
+        let route_r = svc_routes.endpoint( "/ready").get( httpFuncHandler )
+        let route_1 = svc_routes.endpoint( "/bookings/business").get( httpFuncHandler )
 
         let more_routes = routes.router( "/more" )
         let route_m = more_routes.endpoint( "/ready").get( httpFuncHandler )
@@ -194,10 +194,10 @@ final class RouterTests: XCTestCase {
         
         var route_vars: RouterPathVars = [:]
         // let e0 = routes.endpoint( "/ready").get( httpFuncHandler )
-        // let e1 = routes.root.match( .GET, RouterPath( "/ringr/ready"), &route_vars)
+        // let e1 = routes.root.match( .GET, RouterPath( "/svc/ready"), &route_vars)
         // let e2 = routes.root.match( .GET, RouterPath( "/more/ready"), &route_vars)
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/ready"            ), &route_vars ) === route_r )
-        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ringr/bookings/business"), &route_vars ) === route_1 )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/ready"            ), &route_vars ) === route_r )
+        XCTAssertTrue(routes.root.match( .GET, RouterPath( "/svc/bookings/business"), &route_vars ) === route_1 )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/ready"            ), &route_vars ) !== route_r )
         XCTAssertTrue(routes.root.match( .GET, RouterPath( "/bookings/business"), &route_vars ) !== route_1 )
         
