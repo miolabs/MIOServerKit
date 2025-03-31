@@ -119,13 +119,27 @@ final class WebSocketServerTests: XCTestCase {
     }
 
 // MARK: - invalid conn
-    // func test_InvalidConnection_01() async throws {
-    //     let server = try await launchServer()
-    //     let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
-    //     let client: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: URL(string: "ws://localhost:8888/invalid")!)
-    //     usleep(useconds_t(2 * 1000000)) // seconds
-    //     try server.terminateServer()
-    // }    
+    func test_InvalidConnection_01() async throws {
+        let server = try await launchServer()
+        let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
+        let client: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: URL(string: "ws://localhost:8888/invalid")!)
+        usleep(useconds_t(2 * 1000000)) // seconds
+        XCTAssertTrue(client.isClosed())
+        try server.terminateServer()
+    } 
+
+    func test_InvalidConnection_02() async throws {
+        let wsEndPoint = WebSocketEndpoint("/socket")
+        let server = try await launchServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
+        let webSocketConnectionFactory = DefaultWebSocketConnectionFactory()
+        let client: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: URL(string: "ws://localhost:8888/invalid")!)
+        usleep(useconds_t(2 * 1000000)) // seconds
+        XCTAssertTrue(client.isClosed())
+        let client2: WebSocketConnection<String, String> = webSocketConnectionFactory.open(at: URL(string: "ws://localhost:8888/socket")!)
+        usleep(useconds_t(2 * 1000000)) // seconds
+        XCTAssertFalse(client2.isClosed())
+        try server.terminateServer()
+    }   
 
 // MARK: - ping
     func test_ClientSendsString_01() async throws {
@@ -251,6 +265,7 @@ final class WebSocketServerTests: XCTestCase {
         try server.terminateServer()
         usleep(useconds_t(2 * 1000000)) // seconds
     }
+
  
 }
 

@@ -1,13 +1,3 @@
-/* To Dos
-
-- buscar xxx
-- validar los endpoints de conexion en 
-    makeCompletedFuture {
-                let upgrader = NIOTypedWebSocketServerUpgrader
-
-
-*/
-
 
 import Foundation
 import NIOCore
@@ -15,7 +5,6 @@ import NIOPosix
 import NIOHTTP1
 import NIOWebSocket
 import MIOServerKit
-
 
 
 class WebSocketChannelWithURI {
@@ -95,11 +84,19 @@ open class NIOWebSocketServer : Server {
             // this happens when a new connection is accepted
             channel.eventLoop.makeCompletedFuture {
                 let upgrader = NIOTypedWebSocketServerUpgrader<UpgradeResult>(
-                    shouldUpgrade: { channel, head in  // decide if a connection can be upgraded to websocket
-                        if self.webSocketClients.ContainsEndpoint(head.uri) {
+                    shouldUpgrade: { channel, requestHead in  // decide if a connection can be upgraded to websocket
+                        if self.webSocketClients.ContainsEndpoint(requestHead.uri) {
                             return channel.eventLoop.makeSucceededFuture(HTTPHeaders())
                         } else {
-                            return channel.eventLoop.makeSucceededFuture(nil)
+                            let responseHead = HTTPResponseHead(version: requestHead.version, status: .forbidden)
+                            let response = HTTPServerResponsePart.head(responseHead)
+
+                            return channel.writeAndFlush(response).flatMap {
+                                channel.close()
+                            }.flatMap {
+                                channel.eventLoop.makeSucceededFuture(nil) // Indica que el upgrade NO se realiza
+                            }
+                            //return channel.eventLoop.makeSucceededFuture(nil)
                             //return channel.eventLoop.makeFailedFuture(NSError(domain:"com.m", code:100, userInfo: ["error":"shouldUpgrade"]))
                         }
                     },
@@ -194,84 +191,7 @@ open class NIOWebSocketServer : Server {
         }
     }
 
-//    private func handleHTTPChannel(
-//         _ channel: NIOAsyncChannel<HTTPServerRequestPart, HTTPPart<HTTPResponseHead, ByteBuffer>>
-//     ) async throws {
-// print("xxxxxxx  1")        
-//         try await channel.executeThenClose { inbound, outbound in
-// print("xxxxxxx  2")       
-//             for try await requestPart in inbound {
-// print("xxxxxxx  3")                
 
-//                 // We're not interested in request bodies here: we're just serving up GET responses
-//                 // to get the client to initiate a websocket request.
-//                 guard case .head(let head) = requestPart else {
-//                     return
-//                 }
-// print("head.method: \(head.method), head.uri: \(head.uri)")
-//                 // GETs only.
-//                 guard case .GET = head.method else {
-//                     try await self.respond405(writer: outbound)
-//                     return
-//                 }
-// print("xxxxxxx  3a") 
-//                 var headers = HTTPHeaders()
-//                 headers.add(name: "Content-Type", value: "text/html")
-//                 headers.add(name: "Content-Length", value: String(responseBody.readableBytes))
-//                 headers.add(name: "Connection", value: "close")
-//                 let responseHead = HTTPResponseHead(
-//                     version: .init(major: 1, minor: 1),
-//                     status: .ok,
-//                     headers: headers
-//                 )
-// print("xxxxxxx  4")
-//                 try await outbound.write(
-//                     contentsOf: [
-//                         .head(responseHead),
-//                         .body(responseBody),
-//                         .end(nil),
-//                     ]
-//                 )
-// print("xxxxxxx  5")             
-//             }
-//           }
-//     }
-
-//     private func respond405(writer: NIOAsyncChannelOutboundWriter<HTTPPart<HTTPResponseHead, ByteBuffer>>) async throws
-//     {
-//         var headers = HTTPHeaders()
-//         headers.add(name: "Connection", value: "close")
-//         headers.add(name: "Content-Length", value: "0")
-//         let head = HTTPResponseHead(
-//             version: .http1_1,
-//             status: .methodNotAllowed,
-//             headers: headers
-//         )
-
-//         try await writer.write(
-//             contentsOf: [
-//                 .head(head),
-//                 .end(nil),
-//             ]
-//         )
-//     }
-// }
-
-// final class HTTPByteBufferResponsePartHandler: ChannelOutboundHandler {
-//     typealias OutboundIn = HTTPPart<HTTPResponseHead, ByteBuffer>
-//     typealias OutboundOut = HTTPServerResponsePart
-
-//     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-//         let part = Self.unwrapOutboundIn(data)
-//         switch part {
-//         case .head(let head):
-//             context.write(Self.wrapOutboundOut(.head(head)), promise: promise)
-//         case .body(let buffer):
-//             context.write(Self.wrapOutboundOut(.body(.byteBuffer(buffer))), promise: promise)
-//         case .end(let trailers):
-//             context.write(Self.wrapOutboundOut(.end(trailers)), promise: promise)
-//         }
-//     }
 
  }
 

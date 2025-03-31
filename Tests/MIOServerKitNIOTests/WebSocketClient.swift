@@ -19,9 +19,23 @@ public protocol WebSocketConnectionFactory: Sendable {
     func open<Incoming: Decodable & Sendable, Outgoing: Encodable & Sendable>(at url: URL) -> WebSocketConnection<Incoming, Outgoing>
 }
 
+class WebSocketDelegate: NSObject, URLSessionTaskDelegate {
+    public var closed = false
+
+    // Tells the delegate that the task finished transferring data.
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        closed = true
+        if let error = error {
+            //print("WebSocket cerrado con error: \(error.localizedDescription)")
+        } else {
+            //print("WebSocket cerrado correctamente")
+        }
+    }
+}
+
 /// A default implementation of ``WebSocketConnectionFactory``.
 public final class DefaultWebSocketConnectionFactory: Sendable {
-    private let urlSession: URLSession
+    //private let urlSession: URLSession
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
@@ -32,11 +46,11 @@ public final class DefaultWebSocketConnectionFactory: Sendable {
     ///   - encoder: JSONEncoder used to encode outgoing message bodies.
     ///   - decoder: JSONDecoder used to decode incoming message bodies.
     public init(
-        urlSession: URLSession = URLSession.shared,
+        //urlSession: URLSession = URLSession.shared,
         encoder: JSONEncoder = JSONEncoder(),
         decoder: JSONDecoder = JSONDecoder()
     ) {
-        self.urlSession = urlSession
+        //self.urlSession = urlSession
         self.encoder = encoder
         self.decoder = decoder
     }
@@ -45,13 +59,12 @@ public final class DefaultWebSocketConnectionFactory: Sendable {
 extension DefaultWebSocketConnectionFactory: WebSocketConnectionFactory {
     public func open<Incoming: Decodable & Sendable, Outgoing: Encodable & Sendable>(at url: URL) -> WebSocketConnection<Incoming, Outgoing> {
         let request = URLRequest(url: url)
-        let webSocketTask = urlSession.webSocketTask(with: request)
+        let delegate = WebSocketDelegate()
+        let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+        let webSocketTask = session.webSocketTask(with: request)
 
-        return WebSocketConnection(
-            webSocketTask: webSocketTask,
-            encoder: encoder,
-            decoder: decoder
-        )
+        let ret =  WebSocketConnection<Incoming, Outgoing>(webSocketTask: webSocketTask, delegate: delegate, encoder: encoder, decoder: decoder)
+        return ret
     }
 }
 
@@ -70,34 +83,23 @@ public final class WebSocketConnection<Incoming: Decodable & Sendable, Outgoing:
     private let webSocketTask: URLSessionWebSocketTask
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let delegate: WebSocketDelegate
 
-    internal init(webSocketTask: URLSessionWebSocketTask, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) {
+    internal init(webSocketTask: URLSessionWebSocketTask, delegate: WebSocketDelegate, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) {
         self.webSocketTask = webSocketTask
+        self.delegate = delegate
         self.encoder = encoder
         self.decoder = decoder
         super.init()
         webSocketTask.resume()
     }
-/*
-
-let url = URL(string: "wss://tu-servidor.com/socket")!
-let task = URLSession(configuration: .default).webSocketTask(with: url)
-task.resume()
-
-// Esperamos un segundo para darle oportunidad de conectar 
-DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-    task.sendPing { error in
-        if let error = error {
-            print("❌ No conectado: \(error.localizedDescription)")
-        } else {
-            print("✅ Conectado al WebSocket")
-        }
-    }
-}
-*/
 
     deinit {
         webSocketTask.cancel(with: .goingAway, reason: nil) // Make sure to cancel the WebSocketTask (if not already canceled or completed)
+    }
+
+    public func isClosed() -> Bool {
+        return delegate.closed
     }
 
     private func receiveSingleMessage() async throws -> Incoming {
