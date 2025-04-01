@@ -150,14 +150,15 @@ public final class WebSocketConnection<Incoming: Decodable & Sendable, Outgoing:
 // MARK: Public Interface
 
 extension WebSocketConnection {
+    // This library does not support manually setting the 'fin' flag so we can't test splitting messages too big for a frame
     func send(_ message: Outgoing) async throws {
         do {
-            if Outgoing.self == String.self {
+            if Outgoing.self == String.self {  // send string
                 guard let stringValue = message as? String else {
                     return 
                 }
                 try await webSocketTask.send(.string(stringValue))
-            } else {
+            } else { // send binary
                 guard let messageData = try? encoder.encode(message) else {
                     throw WebSocketConnectionError.encodingError
                 }

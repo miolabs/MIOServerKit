@@ -167,7 +167,6 @@ open class NIOWebSocketServer : Server {
         }
     }
 
-    //private func handleWebsocketChannel(_ channel: NIOAsyncChannel<WebSocketFrame, WebSocketFrame>) async throws {
     private func handleWebsocketChannel(_ channel: WebSocketChannelWithURI) async throws {
         try await channel.channel.executeThenClose { inbound, outbound in
             try await withThrowingTaskGroup(of: Void.self) { group in
@@ -176,11 +175,15 @@ open class NIOWebSocketServer : Server {
                 let newClient = webSocketClients.AddClient(channel.uri, newClientId, channel.channel.channel.allocator, inbound, outbound)
                 if newClient != nil {
                     group.addTask {
-                        for try await frame in inbound {
-                            let closeConnection = try await newClient!.gotFrame(frame)
-                            if closeConnection {
-                                return
+                        do {
+                            for try await frame in inbound {
+                                let closeConnection = try await newClient!.gotFrame(frame)
+                                if closeConnection {
+                                    return
+                                }
                             }
+                        } catch {
+                            print("Exception en handleWebsocketChannel: \(error)")
                         }
                     }
                     try await group.next() 

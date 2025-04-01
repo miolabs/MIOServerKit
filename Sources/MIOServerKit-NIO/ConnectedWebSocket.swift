@@ -85,6 +85,12 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
             switch frame.opcode {
                 case .text:
                     var frameData = frame.data
+                    if frame.fin == false {
+                        print("Received FRAGMENTED frame")
+                    }
+                    else {
+                        print("Received TEXT frame")
+                    }
                     let maskingKey = frame.maskKey
                     if let maskingKey = maskingKey {
                         frameData.webSocketUnmask(maskingKey)
@@ -102,13 +108,15 @@ open class ConnectedWebSocket : ConnectedWebSocketOperations {
                     let responseFrame = WebSocketFrame(fin: true, opcode: .pong, data: frameData)
                     try await outbound.write(responseFrame)
                 case .connectionClose:
-                    //print("Received close")
                     var data = frame.unmaskedData
                     let closeDataCode = data.readSlice(length: 2) ?? ByteBuffer()
                     let closeFrame = WebSocketFrame(fin: true, opcode: .connectionClose, data: closeDataCode)
                     try await outbound.write(closeFrame)
                     closeConnection = true
-                case .binary, .continuation, .pong:
+                case .continuation:
+                    print("Received CONTINUATION frame")
+                    break
+                case .binary, .pong:
                     // xxxxx
                     break
                 default:

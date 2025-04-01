@@ -106,7 +106,7 @@ func launchServer(routes: Router = Router(), webSocketEndpoints: [WebSocketEndpo
         } 
     let serverOk = server.waitForServerRunning()
     XCTAssertTrue(serverOk)
-    ////usleep(2 * 1000000) // seconds
+    usleep(1 * 1000000) // seconds
     return (server)
 }
 
@@ -266,8 +266,54 @@ final class WebSocketServerTests: XCTestCase {
         usleep(useconds_t(2 * 1000000)) // seconds
     }
 
+// MARK: - big frames
+    func test_MaxFrameSize_OK() async throws {
+        let clientMsgSize = 16 * 1024
+        let clientMsg = String(repeating: "U", count: clientMsgSize)
+        var closureCalled = false
+        let wsEndPoint = WebSocketEndpoint("/socket").OnText { message, _ in
+            XCTAssertEqual(message.count, clientMsgSize)
+            closureCalled = true
+        }
+        let server = try await launchServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
+
+        let clientTask = Task.detached {
+            await connectToServerAndWrite("ws://localhost:8888/socket", clientMsg)
+        }
+        _ = await clientTask.result
+
+        let startTime = Date()
+        let timeOutSecs: TimeInterval  = 3
+        while !closureCalled && Date().timeIntervalSince(startTime) < timeOutSecs { usleep(100000) } // give time to read the message 
+        try server.terminateServer()
+        XCTAssertTrue(closureCalled)
+        usleep(2 * 1000000)
+    }
+
+    // If the client sends a frame bigger than the server's max frame size, the server will close the connection
+    func test_FrameTooBig() async throws {
+        let clientMsgSize = 16 * 1024 + 1
+        let clientMsg = String(repeating: "U", count: clientMsgSize)
+        var closureCalled = false
+        let wsEndPoint = WebSocketEndpoint("/socket").OnText { message, _ in
+            XCTAssertEqual(message.count, clientMsgSize)
+            closureCalled = true
+        }
+        let server = try await launchServer(routes: Router(), webSocketEndpoints: [wsEndPoint] )
+
+        let clientTask = Task.detached {
+            await connectToServerAndWrite("ws://localhost:8888/socket", clientMsg)
+        }
+        _ = await clientTask.result
+
+        let startTime = Date()
+        let timeOutSecs: TimeInterval  = 3
+        while !closureCalled && Date().timeIntervalSince(startTime) < timeOutSecs { usleep(100000) } // give time to read the message 
+        try server.terminateServer()
+        XCTAssertTrue(!closureCalled)
+        usleep(2 * 1000000)
+    }
  
 }
-
 
 
