@@ -36,7 +36,7 @@ open class MSKServer<T>: MSKRouter<T> {
         }
 
         // Setting up CORS
-        let options = Options(allowedOrigin: .all, methods: ["GET", "POST", "PUT", "PATCH"], maxAge: 5)
+        let options = Options(allowedOrigin: .all, methods: ["GET", "POST", "PUT", "PATCH", "DELETE"], maxAge: 5)
         let cors = CORS(options: options)
 
         kituraRouter.all(middleware: cors)
@@ -66,9 +66,7 @@ open class MSKServer<T>: MSKRouter<T> {
         if endpoint != nil {
             request.parameters = route_vars
             do {
-//                try Fortify.exec {
-                    try self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
-//                }
+                try self.process( endpoint!.methods[ method ]!.cb, route_vars, request, response )
             }
             catch {
                 Log.error( "\(error)" )
