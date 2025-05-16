@@ -1,4 +1,6 @@
-[![macOS: supported](https://img.shields.io/badge/mac-supported-green)]
+[Linux: supported](https://img.shields.io/badge/linux-supported-green)
+[macOS: supported](https://img.shields.io/badge/mac-supported-green)
+[Windows: supported](https://img.shields.io/badge/win-supported-red)
 
 # MIOServerKit
 
