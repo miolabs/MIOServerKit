@@ -7,6 +7,10 @@
 
 MIOServerKit is a lightweight, flexible Swift server framework that provides HTTP routing capabilities with multiple backend implementations. It offers a consistent API while supporting both IBM's Kitura and Apple's SwiftNIO as underlying engines.
 
+### ⚠️ Warning
+
+**Kitura server is deprecated. It will be delete in future  releases.**
+
 ## Features
 
 - Multi-backend support (Kitura and SwiftNIO)
