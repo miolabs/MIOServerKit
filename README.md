@@ -33,7 +33,7 @@ targets: [
 ]
 ```
 
-## Usage
+## Usage Kitura server option
 
 ### Basic Example
 
@@ -61,6 +61,50 @@ server.router.get("/users/:id") { request, response, next in
         response.send("User ID: \(userId)")
     }
     next()
+}
+```
+
+### Using swift-nio
+
+MIOServerKit-NIO supports sync and async/await for handling requests
+
+The `RouterContext` provides a convenient way to access request data and send responses:
+
+```swift
+// Sync version
+server.router.endpoint("/api/data").post { context in throws -> Any? in
+    // Access body parameters
+    let name: String = try context.bodyParam("name")
+    let age: Int = try context.bodyParam("age")
+    
+    // Return JSON response
+    return ["status": "success", "data": ["name": name, "age": age]]
+}
+
+// Async version
+server.router.endpoint("/api/data").post { context in async throws -> Any? in
+    // Access body parameters
+    let name: String = try context.bodyParam("name")
+    
+    // Perform async operations
+    let userData = try await processUserData(name)
+    
+    // Return JSON response
+    return userData
+}
+
+// Using async endpoint handlers
+server.router.endpoint("/users").get { (context: RouterContext) async throws -> Any? in
+    // Perform async operations
+    let users = try await fetchUsersFromDatabase()
+    return ["users": users]
+}
+
+// With path parameters
+server.router.endpoint("/users/:id").get { (context: RouterContext) async throws -> Any? in
+    let userId: String = try context.urlParam("id")
+    let user = try await fetchUserById(userId)
+    return user
 }
 ```
 

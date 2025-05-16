@@ -69,7 +69,7 @@ open class NIOServer : Server
     
     public func waitForServerRunning(timeoutSeconds:Int = 5 ) -> Bool {
         if alreadyRunning.wait(timeout: .now() + .seconds(timeoutSeconds)) == .timedOut {
-            print("Timeout waiting for Server to start.")
+            Log.warning("Timeout waiting for Server to start.")
             return false
         }
         return true
@@ -79,9 +79,9 @@ open class NIOServer : Server
         do {
             try channel?.close().wait()
             //try group?.syncShutdownGracefully()
-            print("Server terminated.")
+            Log.warning("Server terminated.")
         } catch {
-            print("Error terminating server: \(error)")
+            Log.error("Error terminating server: \(error)")
         }
     }
 }

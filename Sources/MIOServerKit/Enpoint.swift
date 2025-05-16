@@ -238,35 +238,67 @@ public class EndpointPath
 
 // MARK: - MethodEndpoint
 
-public typealias EndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) throws -> Any?
+public typealias SyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) throws -> Any?
+public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) async throws -> Any?
 
-protocol MethodEndpointExecutionProtocol
-{
-    func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
+public typealias MethodEndpointCompletionBlock = ( Any?, Error? ) -> Void
+
+protocol MethodEndpointExecutionProtocol {
+    func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
 }
 
 public struct MethodEndpoint
 {
-    struct EndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
+    // Wrapper for sync callbacks
+    struct SyncEndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
     {
-        let cb: EndpointRequestDispatcher<T>
+        let cb: SyncEndpointRequestDispatcher<T>
         
-        init ( _ cb: @escaping EndpointRequestDispatcher<T> ) {
+        init ( _ cb: @escaping SyncEndpointRequestDispatcher<T> ) {
             self.cb = cb
         }
         
-        func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping ( Any? ) throws -> Void ) throws
+        func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
         {
-            let ctx = try T.init( settings, request, response )
             do {
-                try ctx.willExectute()
+                let ctx = try T.init( settings, request, response )
+                try ctx.willExecute()
                 let result = try cb( ctx )
-                try completion( result )
                 try ctx.didExecute()
+                
+                completion( result, nil )
             }
             catch {
                 Log.error( "\(error)" )
-                throw error
+                completion( nil, error )
+            }
+        }
+    }
+        
+    // Wrapper for async callbacks
+    struct AsyncEndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
+    {
+        let cb: AsyncEndpointRequestDispatcher<T>
+        
+        init ( _ cb: @escaping AsyncEndpointRequestDispatcher<T> ) {
+            self.cb = cb
+        }
+        
+        func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
+        {
+            Task {
+                do {
+                    let ctx = try T.init( settings, request, response )
+                    try await ctx.willExecute()
+                    let result = try await cb( ctx )
+                    try await ctx.didExecute()
+                    
+                    completion( result, nil )
+                }
+                catch {
+                    Log.error( "\(error)" )
+                    completion( nil, error )
+                }
             }
         }
     }
@@ -274,15 +306,20 @@ public struct MethodEndpoint
     var wrapper: any MethodEndpointExecutionProtocol
     var extra_url: RouterPath?
 
-    init <T:RouterContext>(cb: @escaping ( _ context: T ) throws -> Any?, extra_url: RouterPath? = nil )
-    {
-        wrapper = EndpointWrapper( cb )
+    // Init for sync callbacks
+    init <T:RouterContext>(cb: @escaping ( _ context: T ) throws -> Any?, extra_url: RouterPath? = nil ) {
+        wrapper = SyncEndpointWrapper( cb )
         self.extra_url = extra_url
     }
     
-    public func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping (Any?) throws -> Void ) throws
-    {
-        try wrapper.run( settings, request, response, completion )
+    // Init for async callbacks
+    init <T:RouterContext>(async_cb: @escaping AsyncEndpointRequestDispatcher<T>, extra_url: RouterPath? = nil ) {
+        wrapper = AsyncEndpointWrapper( async_cb )
+        self.extra_url = extra_url
+    }
+
+    public func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
+        wrapper.run( settings, request, response, completion )
     }
 }
 
@@ -294,36 +331,66 @@ public class Endpoint : EndpointPath
     public var methods: [ EndpointMethod : MethodEndpoint ] = [:]
     
 //    public var methods: [ EndpointMethod: (cb: EndpointRequestDispatcher<T>, extra_url: RouterPath?, ct: RouterContextProtocol) ] = [:]
-        
+
+    // Sync methods    
     @discardableResult
-    public func get<T>( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .GET, cb, url )
+    public func get<T>( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .GET, cb, url )
     }
 
     @discardableResult
-    public func post<T>( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .POST, cb, url )
+    public func post<T>( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .POST, cb, url )
     }
     
     @discardableResult
-    public func put<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .PUT, cb, url )
+    public func put<T> ( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .PUT, cb, url )
     }
     
     @discardableResult
-    public func patch<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .PATCH , cb, url )
+    public func patch<T> ( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .PATCH , cb, url )
     }
 
     @discardableResult
-    public func delete<T> ( _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
-        return addMethod( .DELETE, cb, url )
+    public func delete<T> ( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .DELETE, cb, url )
     }
     
-    public func addMethod<T> ( _ method: EndpointMethod, _ cb: @escaping EndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
-//        methods[ method ] = ( cb: cb, extra_url: url != nil ? RouterPath( url! ): nil, ct: ct )
-        
+    func addSyncMethod<T> ( _ method: EndpointMethod, _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
         methods[ method ] = MethodEndpoint(cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
+        return self
+    }
+
+    // Async methods
+    @discardableResult
+    public func get<T>( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .GET, cb, url )
+    }
+
+    @discardableResult
+    public func post<T>( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .POST, cb, url )
+    }
+    
+    @discardableResult
+    public func put<T> ( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .PUT, cb, url )
+    }
+    
+    @discardableResult
+    public func patch<T> ( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .PATCH , cb, url )
+    }
+
+    @discardableResult
+    public func delete<T> ( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .DELETE, cb, url )
+    }
+
+    func addAsyncMethod<T> ( _ method: EndpointMethod, _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
+        methods[ method ] = MethodEndpoint(async_cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
         return self
     }
 

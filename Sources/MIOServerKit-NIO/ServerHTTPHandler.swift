@@ -18,24 +18,23 @@ class ServerHTTPHandler: ChannelInboundHandler
     public typealias InboundIn = HTTPServerRequestPart
     public typealias OutboundOut = HTTPServerResponsePart
         
-    private enum State
-    {
+    private enum State {
         case idle
         case waitingForRequestBody
         case sendingResponse
         
         mutating func requestReceived() {
-            precondition(self == .idle, "Invalid state for request received: \(self)")
+            precondition( self == .idle, "Invalid state for request received: \(self)" )
             self = .waitingForRequestBody
         }
 
         mutating func requestComplete() {
-            precondition(self == .waitingForRequestBody, "Invalid state for request complete: \(self)")
+            precondition( self == .waitingForRequestBody, "Invalid state for request complete: \(self)" )
             self = .sendingResponse
         }
 
         mutating func responseComplete() {
-            precondition(self == .sendingResponse, "Invalid state for response complete: \(self)")
+            precondition( self == .sendingResponse, "Invalid state for response complete: \(self)" )
             self = .idle
         }
     }
@@ -61,7 +60,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         self.serverSettings = settings
     }
     
-    public func dispatchRequest ( ) throws 
+    private func dispatch_request( completion: @escaping MethodEndpointCompletionBlock )
     {
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
@@ -73,43 +72,19 @@ class ServerHTTPHandler: ChannelInboundHandler
 
         if endpoint != nil && endpoint!.methods[ method ] != nil
         {
-            if method == .HEAD { response.status(.ok); return }
+            if method == .HEAD { response.status(.ok); completion(nil, nil) }
             else {
                 request.parameters = route_vars
                 let endpoint_spec = endpoint!.methods[ method ]!
-                try self.process( endpoint_spec, route_vars )
+                endpoint_spec.run( serverSettings, request, response, completion )
             }
         }
-        else
-        {
-            // TODO: respond: page not found
-            response.status(.notFound)
-            response.body = "NOT FOUND: \(method.rawValue) \(path)"
+        else {
+            completion( nil, ServerError.endpointNotFound( path, method.rawValue ) )
         }
-    }
-
-    open func process( _ endpoint_spec: MethodEndpoint, _ vars: RouterPathVars ) throws 
-    {
-        try endpoint_spec.run( serverSettings, request, response) { result in
-            
-            switch result {
-            case let d as Data: self.buffer.writeData( d )
-            case let s as String: self.buffer.writeString( s )
-            case let arr as [Any]:
-                self.response.headers["Content-Type"] = "application/json"
-                let data = try MIOCoreJsonValue(withJSONObject: arr)
-                self.buffer.writeData( data )
-            case let dic as [String:Any]:
-                self.response.headers["Content-Type"] = "application/json"
-                let data = try MIOCoreJsonValue(withJSONObject: dic)
-                self.buffer.writeData( data )
-            default:break
-            }
-        }
-        
     }
            
-    private func completeResponse(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {
+    private func complete_response(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {
         self.state.responseComplete()
 
         let promise = self.keepAlive ? promise : (promise ?? context.eventLoop.makePromise())
@@ -148,49 +123,90 @@ class ServerHTTPHandler: ChannelInboundHandler
         case .end:
             self.state.requestComplete()
             
-            do {
-                self.buffer.clear()
-                
-                request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
-                try dispatchRequest( )
-                
-                var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response!.status )
-                
-                for (k, v) in response!.headers {
-                    responseHead.headers.add( name: k, value: v )
+            self.buffer.clear()
+            request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
+            dispatch_request() { result, error in
+                if context.eventLoop.inEventLoop {
+                    self.handle_response( result: result, error: error, context: context )
+                } else {
+                    context.eventLoop.execute {
+                        self.handle_response( result: result, error: error, context: context )
+                    }
                 }
-                
-                // Update Content Length header
-                responseHead.headers.add(name: "content-length", value: "\(self.buffer!.readableBytes)")
-                                 
-                let head = HTTPServerResponsePart.head( responseHead )
-                context.write(self.wrapOutboundOut( head ), promise: nil)
-                
-                let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
-                context.write(self.wrapOutboundOut(content), promise: nil)
             }
-            catch 
-            {
-                // TODO Error response
-                self.buffer.clear()
-                self.buffer.writeString( error.localizedDescription )
-                
-                var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: .badRequest )
-                responseHead.headers.add(name: "content-length", value: "\(self.buffer!.readableBytes)")
-                
-                let head = HTTPServerResponsePart.head( responseHead )
-                context.write(self.wrapOutboundOut( head ), promise: nil)
-                
-                let content = HTTPServerResponsePart.body( .byteBuffer( buffer!.slice() ) )
-                context.write(self.wrapOutboundOut(content), promise: nil)
-            }
-            
-            self.completeResponse(context, trailers: nil, promise: nil)
-            
-            self.infoSavedBodyBytes = 0
-            self.infoSavedBodyBuffer = nil
         }
     }
+    
+    func handle_response( result: Any?, error:Error?, context: ChannelHandlerContext )
+    {
+        self.buffer.clear()
+        
+        if let error = error {
+            handle_error(error: error, context: context)
+        }
+        else {
+            do {
+                switch result {
+                case let d as Data  : self.buffer.writeData(d)
+                case let s as String: self.buffer.writeString(s)
+                case let arr as [Any]:
+                    self.response.headers["Content-Type"] = "application/json"
+                    let data = try MIOCoreJsonValue(withJSONObject: arr)
+                    self.buffer.writeData(data)
+                case let dic as [String:Any]:
+                    self.response.headers["Content-Type"] = "application/json"
+                    let data = try MIOCoreJsonValue(withJSONObject: dic)
+                    self.buffer.writeData(data)
+                default: break
+                }
+                response.status = .ok
+            }
+            catch {
+                handle_error(error: error, context: context)
+            }
+        }
+        
+        self.write_response( context: context )
+        self.complete_response(context, trailers: nil, promise: nil)
+        
+        // Clean up
+        self.infoSavedBodyBytes = 0
+        self.infoSavedBodyBuffer = nil
+    }
+    
+    // Method to handle errors
+    private func handle_error(error:Error, context: ChannelHandlerContext)
+    {
+        response.status = .internalServerError
+        
+        if let err = error as? ServerErrorCodeProtocol {
+            response.status = err.errorCode
+        }
+                
+        self.buffer.writeString(error.localizedDescription)
+    }
+
+    // Helper method to write the response on the event loop thread
+    private func write_response( context: ChannelHandlerContext )
+    {
+        var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response!.status)
+        
+        for (k, v) in response!.headers {
+            responseHead.headers.add(name: k, value: v)
+        }
+        
+        // Update Content Length header
+        responseHead.headers.add(name: "content-length", value: "\(self.buffer!.readableBytes)")
+                    
+        let head = HTTPServerResponsePart.head(responseHead)
+        context.write(self.wrapOutboundOut(head), promise: nil)
+        
+        let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
+        context.write(self.wrapOutboundOut(content), promise: nil)
+
+        context.flush()
+    }
+
 
     func channelReadComplete(context: ChannelHandlerContext) {
         context.flush()

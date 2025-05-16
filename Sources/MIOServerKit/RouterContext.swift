@@ -91,15 +91,17 @@ public protocol RouterContextProtocol : AnyObject
     func bodyAsData() -> Data?
     func bodyAsJSON() -> Any?
         
-    func willExectute() throws
+    // Sync methods
+    func willExecute() throws
     func didExecute() throws
+
+    // Async methods
+    func willExecute() async throws
+    func didExecute() async throws
 }
 
 extension RouterContextProtocol
 {
-    public func willExectute() throws { }
-    public func didExecute() throws { }
-    
     public func urlParam<T> ( _ name: String ) throws -> T {
         return try MIOCoreParam( request.parameters, name )
     }
@@ -144,6 +146,14 @@ extension RouterContextProtocol
         if optional { return nil }
         throw ServerError.fieldNotFound( name )
     }
+    
+    // Default implementations for sync methods
+    public func willExecute() throws { }
+    public func didExecute() throws { }
+       
+    // Default implementations for async methods
+    public func willExecute() async throws { }
+    public func didExecute() async throws { }
     
 //    public func sendOKResponse ( _ json : Any? = nil ) throws {
 //        response.status(.ok)
@@ -288,10 +298,14 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         throw ServerError.fieldNotFound( name )
     }
     
-    open func willExectute() throws { }
+    // Default implementations for sync methods
+    open func willExecute() throws { }
     open func didExecute() throws { }
-
-    
+        
+    // Default implementations for async methods
+    open func willExecute() async throws { }
+    open func didExecute() async throws { }
+        
 //    public func sendOKResponse ( _ json : Any? = nil ) throws {
 //        response.status(.ok)
 //
