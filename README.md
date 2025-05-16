@@ -64,7 +64,7 @@ server.router.get("/users/:id") { request, response, next in
 }
 ```
 
-### Using swift-nio
+## Usage SwiftNIO server option
 
 MIOServerKit-NIO supports sync and async/await for handling requests
 
