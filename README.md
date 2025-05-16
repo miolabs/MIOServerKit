@@ -66,9 +66,37 @@ server.router.get("/users/:id") { request, response, next in
 
 ## Usage SwiftNIO server option
 
-MIOServerKit-NIO supports sync and async/await for handling requests
+### Basic Example
 
-The `RouterContext` provides a convenient way to access request data and send responses:
+```swift
+import MIOServerKit
+
+// Create a server instance
+let server = Server()
+
+// Add routes
+server.router.get("/hello") { context in
+    return "Hello, World!"    
+}
+
+// Start the server
+try server.start(port: 8080)
+```
+
+### Using Path Parameters
+
+```swift
+server.router.get("/users/:id") { context in
+    if let userId = context.urlParam("id") {
+        return "User ID: \(userId)"
+    }
+    return "User not found"
+}
+```
+
+### Using Router Context
+
+The `RouterContext` provides a convenient way to access request data and send responses and also support sync and async/await for handling requests.
 
 ```swift
 // Sync version
@@ -139,11 +167,6 @@ swift test
 Run a specific test:
 ```
 swift test --filter MIOServerKitTests/testSpecificName
-```
-
-Generate Xcode project:
-```
-swift package generate-xcodeproj
 ```
 
 ## License
