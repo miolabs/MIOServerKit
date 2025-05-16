@@ -96,7 +96,7 @@ server.router.get("/users/:id") { context in
 
 ### Using Router Context
 
-The `RouterContext` provides a convenient way to access request data and send responses and also support sync and async/await for handling requests.
+The `RouterContext` provides a convenient way to access request data and send responses. It also support sync and async/awaits for handling requests.
 
 ```swift
 // Sync version
