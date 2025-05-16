@@ -1,3 +1,5 @@
+[![macOS: supported](https://img.shields.io/badge/mac-supported-green)]
+
 # MIOServerKit
 
 MIOServerKit is a lightweight, flexible Swift server framework that provides HTTP routing capabilities with multiple backend implementations. It offers a consistent API while supporting both IBM's Kitura and Apple's SwiftNIO as underlying engines.
