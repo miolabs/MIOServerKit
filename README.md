@@ -121,15 +121,8 @@ server.router.endpoint("/api/data").post { context in async throws -> Any? in
     return userData
 }
 
-// Using async endpoint handlers
-server.router.endpoint("/users").get { (context: RouterContext) async throws -> Any? in
-    // Perform async operations
-    let users = try await fetchUsersFromDatabase()
-    return ["users": users]
-}
-
 // With path parameters
-server.router.endpoint("/users/:id").get { (context: RouterContext) async throws -> Any? in
+server.router.endpoint("/users/:id").get { context in async throws -> Any? in
     let userId: String = try context.urlParam("id")
     let user = try await fetchUserById(userId)
     return user
