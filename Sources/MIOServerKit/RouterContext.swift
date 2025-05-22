@@ -130,17 +130,11 @@ extension RouterContextProtocol
 
         if let dict = json as? [ String:Any ] {
 
-            if dict.keys.contains(name) {
-                if optional { return nil }
-                throw ServerError.fieldNotFound( name )
-            }
-
             if let value = dict[ name ] as? T {
                 return value
             }
-
-            if optional { return nil }
-            throw ServerError.fieldNotFound( name )
+            else if optional { return nil }
+            else { throw ServerError.fieldNotFound( name ) }
         }
 
         if optional { return nil }
@@ -281,17 +275,11 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
 
         if let dict = json as? [ String:Any ] {
 
-            if !dict.keys.contains(name) {
-                if optional { return nil }
-                throw ServerError.fieldNotFound( name )
-            }
-
             if let value = dict[ name ] as? T {
                 return value
             }
-
-            if optional { return nil }
-            throw ServerError.fieldNotFound( name )
+            else if optional { return nil }
+            else { throw ServerError.fieldNotFound( name ) }
         }
 
         if optional { return nil }
