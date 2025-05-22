@@ -21,6 +21,24 @@ func httpFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     return response
 }
 
+#if !os(macOS)
+extension MIOServerKitNIOTests {
+    static var allTests = [
+        ("testReplaceURLs", testReplaceURLs),
+        ("testRootPaths01", testRootPaths01),
+        ("testRootPaths02", testRootPaths02),
+        ("testOneSubrouterPaths01", testOneSubrouterPaths01),
+        ("testOneSubrouterPaths02", testOneSubrouterPaths02),
+        ("testOneSubrouterPaths03", testOneSubrouterPaths03),
+        ("testRootAndSubrouterPaths", testRootAndSubrouterPaths),
+        ("testRootAndTwoSubroutersPaths", testRootAndTwoSubroutersPaths),
+        ("testRootTwoRoutersPaths", testRootTwoRoutersPaths),
+        ("testAsyncEndpoint", testAsyncEndpoint),
+        ("testHeadRequest", testHeadRequest)
+    ]
+}
+#endif
+
 func httpRootFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         //"status": "success"
@@ -62,6 +80,16 @@ class HTTPClient {
         request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Content-Type") // Ajusta si envías otro tipo de datos
         
+        let task = URLSession.shared.dataTask(with: request, completionHandler: completion)
+        task.resume()
+    }
+    func head(url: String, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+        guard let requestUrl = URL(string: url) else {
+            completion(nil, nil, NSError(domain: "Invalid URL", code: -1, userInfo: nil))
+            return
+        }
+        var request = URLRequest(url: requestUrl)
+        request.httpMethod = "HEAD"
         let task = URLSession.shared.dataTask(with: request, completionHandler: completion)
         task.resume()
     }
@@ -137,6 +165,30 @@ func canonicalGetRequest(_ url : String, _ expectedParam:String = "") throws -> 
     let timeout = DispatchTime.now() + .seconds(5)
     if semaphore.wait(timeout: timeout) == .timedOut {
         XCTFail("****** REQUEST TIME OUT (get)!!  ********************")
+    }
+    return ret
+}
+// MARK: - call head
+func canonicalHeadRequest(_ url : String) throws -> Int {
+    let semaphore = DispatchSemaphore(value: 0)
+    let httpClient = HTTPClient(URLSession(configuration: URLSessionConfiguration.default))
+    var ret = 0
+    httpClient.head(url: url) { data, response, error in
+        XCTAssertNil(error, "Error: \(error!)")
+        if let httpResponse = response as? HTTPURLResponse {
+            ret = httpResponse.statusCode
+        } else {
+            XCTFail("Unexpected response type")
+        }
+        XCTAssertNotNil(data)
+        if let responseData = data {
+            XCTAssertEqual(responseData.count, 0)
+        }
+        semaphore.signal()
+    }
+    let timeout = DispatchTime.now() + .seconds(5)
+    if semaphore.wait(timeout: timeout) == .timedOut {
+        XCTFail("****** REQUEST TIME OUT (head)!!  ********************")
     }
     return ret
 }
@@ -373,7 +425,7 @@ final class MIOServerKitNIOTests: XCTestCase {
 
 // MARK: - 2 subrouters
     func testRootTwoRoutersPaths() throws {
-         let urls: [String: [String]] = [
+        let urls: [String: [String]] = [
             "/ringr": ["/ready", "/bookings/business-info", "/bookings/update"],
             "/more": ["/ready", "/another/update"],
         ]
@@ -391,6 +443,33 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/ready/"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/another/update"), 200)
         
+        try server.terminateServer()
+    }
+
+    // MARK: - Async endpoint
+    func testAsyncEndpoint() throws {
+        let routes = Router()
+        routes.endpoint("/async").get { context in async throws -> Any? in
+            return ["url": context.request.url.absoluteString]
+        }
+
+        let (server, _) = launchServerHttp(routes)
+
+        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/async"), 200)
+
+        try server.terminateServer()
+    }
+
+    // MARK: - HEAD request
+    func testHeadRequest() throws {
+        let routes = Router()
+        let ep = routes.endpoint("/head")
+        _ = ep.addSyncMethod(.HEAD, { (_: RouterContext) throws -> Any? in return nil }, nil)
+
+        let (server, _) = launchServerHttp(routes)
+
+        XCTAssertEqual(try canonicalHeadRequest("http:/localhost:8080/head"), 200)
+
         try server.terminateServer()
     }
 
