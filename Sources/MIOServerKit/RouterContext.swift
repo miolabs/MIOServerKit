@@ -130,7 +130,7 @@ extension RouterContextProtocol
 
         if let dict = json as? [ String:Any ] {
 
-            if dict.keys.contains(name) {
+            if !dict.keys.contains(name) {
                 if optional { return nil }
                 throw ServerError.fieldNotFound( name )
             }
