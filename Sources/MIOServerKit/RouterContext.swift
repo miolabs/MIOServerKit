@@ -204,7 +204,6 @@ extension RouterContextProtocol
 
 @objc
 open class RouterContext : MIOCoreContext, RouterContextProtocol
-//extension RouterContextProtocol
 {
     public var request: RouterRequest
     public var response: RouterResponse
@@ -281,17 +280,11 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
 
         if let dict = json as? [ String:Any ] {
 
-            if !dict.keys.contains(name) {
-                if optional { return nil }
-                throw ServerError.fieldNotFound( name )
-            }
-
             if let value = dict[ name ] as? T {
                 return value
             }
-
-            if optional { return nil }
-            throw ServerError.fieldNotFound( name )
+            else if optional { return nil }
+            else { throw ServerError.fieldNotFound( name ) }
         }
 
         if optional { return nil }
@@ -306,7 +299,20 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     open func willExecute() async throws { }
     open func didExecute() async throws { }
         
-//    public func sendOKResponse ( _ json : Any? = nil ) throws {
+    open func extraResponseHeaders ( ) -> [String:String] { return [:] }
+    open func responseBody ( _ value : Any? = nil ) throws -> Data? {
+        switch value {
+        case let d as Data  : return d
+        case let s as String: return s.data(using: .utf8)
+        case let arr as [Any]:
+            self.response.headers["Content-Type"] = "application/json"
+            return try MIOCoreJsonValue(withJSONObject: arr)
+        case let dic as [String:Any]:
+            self.response.headers["Content-Type"] = "application/json"
+            return try MIOCoreJsonValue(withJSONObject: dic)
+        default: return nil
+        }
+    }
 //        response.status(.ok)
 //
 //        if json == nil {

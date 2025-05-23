@@ -44,7 +44,7 @@ public class EndpointTreeNode
         // HAS (null)
         // INS: /a/b/c
         // OUT: /a/b/c
-        if nodes.count == 0 && value == nil && !is_root{
+        if nodes.count == 0 && value == nil && !is_root {
             value = ep
         } else {
             insert( EndpointTreeNode( ep ) )
@@ -84,10 +84,10 @@ public class EndpointTreeNode
             //   - book
             if root_diff.common.is_empty() 
             {
-                let cloned = self.clone( )
-                self.clean( )
-                
-                insert_subnode( cloned )
+//                let cloned = self.clone( )
+//                self.clean( )
+//                
+//                insert_subnode( cloned )
                 insert_subnode( node )
             } 
             else
@@ -225,27 +225,28 @@ public class EndpointTreeNode
 // MARK: - Match    
     public func match ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint?
     {
-        if value == nil {
-            return route.is_empty() ?
-                        null_node?.match( method, route, &vars ) :
-                        match_subnode( method, route, &vars )
-        } else {
-            if route.is_empty() && value!.path.is_empty() {  
-                // XXXX y el metodo??!!!  BUG
+        if value == nil && route.is_empty() {
+            return null_node?.match( method, route, &vars )
+        }
+        else if route.is_empty() && value!.path.is_empty() {
+            if ( self.value as? Endpoint )?.methods.keys.contains( method ) != nil {
                 return self.value as? Endpoint
             }
-            
-            let diff = value!.match( method, route, &vars )
-
-            if diff == nil || diff!.common.is_empty() {
-                return nil
-            } else {
-                if diff!.right.is_empty() && diff!.left.is_empty() {
-                    return self.value as? Endpoint
-                }
-
-                return match_subnode( method, diff!.right, &vars )
-            }
+            return nil
+        }
+        else {
+            return match_subnode( method, route, &vars )
+//            let diff = value!.match( method, route, &vars )
+//
+//            if diff == nil || diff!.common.is_empty() {
+//                return nil
+//            } else {
+//                if diff!.right.is_empty() && diff!.left.is_empty() {
+//                    return self.value as? Endpoint
+//                }
+//
+//                return match_subnode( method, diff!.right, &vars )
+//            }
         }
     }
     
@@ -318,4 +319,103 @@ public class EndpointTreeNode
     }
 }
 
-public class EndpointTree : EndpointTreeNode { }
+public class EndpointTree
+{
+    var subNodes: [String:EndpointTree] = [:]
+    var pathNode:RouterPathNode? = nil
+    var optionalPaths: [RouterPathNode]? = nil
+    var endpoint:Endpoint? = nil
+    
+    func find( path: RouterPath ) -> (EndpointTree?, RouterPath) {
+        if path.parts.isEmpty { return (self, path) }
+
+        let key = path.parts.first?.key
+        if key == nil { return (nil, path.drop_first()) }
+        
+        let node = subNodes[ key! ]
+        if node == nil { return (self, path) }
+                
+        return node!.find(path: path.drop_first())
+    }
+    
+    func insert( path: RouterPath ) -> EndpointTree {
+        if path.parts.isEmpty { return self }
+        
+        // Check for optionals paths
+        var path = path
+        var path_node = path.parts.first
+        while path_node != nil && path_node!.isOptional {
+            if optionalPaths == nil { optionalPaths = [ ] }
+            optionalPaths!.append( path_node! )
+            path = path.drop_first()
+            path_node = path.parts.first
+        }
+        
+        // If we found optionals, we can not continue adding path nodes because optionals mark a leaf node.
+        if optionalPaths?.isEmpty == false { return self }
+        
+        let node = EndpointTree()
+        
+        node.pathNode = path_node
+        subNodes[ node.pathNode!.key ] = node
+        
+        return node.insert( path: path.drop_first() )
+    }
+    
+    public func match ( _ path: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint? {
+        if path.parts.isEmpty { return endpoint }
+                        
+        let key = path.parts.first?.key
+        if key == nil { return self.endpoint }
+        
+        var node = subNodes[ key! ]
+        var path_node = path.parts.first
+        
+        // Check for var nodes
+        if node == nil {
+            let var_nodes = subNodes.values.filter { $0.pathNode!.isVar }
+            if path_node == nil { return nil }
+            for n in var_nodes {
+                if n.pathNode!.match( path_node! ) {
+                    vars[ n.pathNode!.key ] = path_node!.key
+                    node = n
+                    break
+                }
+            }
+        }
+            
+        // Check for optionals inside the node
+        if node == nil {
+            var path = path
+            node = self
+            for n in optionalPaths ?? [] {
+                if path_node == nil { break }
+                if n.match( path_node! ) {
+                    vars[ n.key ] = path_node!.key
+                    path = path.drop_first()
+                    path_node = path.parts.first
+                }
+                else {
+                    node = nil
+                    break
+                }
+            }
+        }
+            
+        return node?.match(path.drop_first(), &vars)
+    }
+    /*
+    public func match_vars ( _ path: RouterPath, _ vars: inout RouterPathVars, _ pathVars: [RouterPathNode] = [], captureCount: inout Int ) -> Bool {
+        guard let path_var = pathVars.first else { return true }
+        guard let value = path.parts.first else { return path_var.is_optional }
+        
+        if path_var.match( value ) {
+            vars[path_var.key] = value.key
+            captureCount += 1
+            return match_vars( path.drop_first(), &vars, Array(pathVars.dropFirst()), captureCount: &captureCount )
+        }
+        
+        return false
+    }
+     */
+}

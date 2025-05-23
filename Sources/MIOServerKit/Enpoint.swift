@@ -10,181 +10,6 @@ import Foundation
 import MIOCore
 import MIOCoreLogger
 
-
-// MARK: - Paths
-
-public typealias RouterPathVars = [String:String]
-
-public final class RouterPathNode: Equatable
-{
-    var name: String
-    var key: String
-    var is_var: Bool
-    var is_optional: Bool
-    var regex: NSRegularExpression?
-    
-    
-    public init ( _ n : String ) {
-        name = n
-        is_var = n.first == ":"
-        
-        if let from = name.firstIndex( of: "(" ) {
-            key = String( name[..<from] )
-            
-            let pattern = name.dropFirst( from.utf16Offset(in: name ) )
-            do {
-                regex = try NSRegularExpression( pattern: String( pattern ) )
-            } catch {
-                NSLog( "ERROR IN REGEX: \(pattern)" )
-            }
-        } else {
-            regex = nil
-            key = name
-        }
-        
-        if is_var {
-            key = String( key.dropFirst() )
-        }
-
-        is_optional = key.last == "?"
-
-        if is_optional {
-            key = String( key.dropLast() )
-        }
-    }
-        
-    public func match ( _ node: RouterPathNode ) -> Bool {
-        return is_var && node.is_var ? name == node.name
-             : regex != nil ?
-               regex!.firstMatch( in: node.name, options: [], range: NSRange( location: 0, length: node.name.count ) ) != nil
-             : is_var || name == node.name
-    }
-}
-
-extension RouterPathNode: CustomDebugStringConvertible {
-    public var debugDescription: String {
-        return """
-                name: \(name)
-                key: \(key)
-                isVar: \(is_var)
-                isOptional: \(is_optional)
-                regex: \(regex?.description ?? "nil")
-                """
-    }
-}
-
-
-
-public func ==( left:RouterPathNode, right:RouterPathNode ) -> Bool {
-    return left.name == right.name
-}
-
-
-public typealias RouterPathDiff = ( common: RouterPath, left: RouterPath, right: RouterPath )
-
-public class RouterPath
-{
-    var parts: [RouterPathNode]
-
-    public init ( _ path: String = "" ) {
-        // /usuarios/perfil/config ->  ["", "usuarios", "perfil", "config"] -> ["usuarios", "perfil", "config"] ->
-        // -> [RouterPathNode("usuarios"), RouterPathNode("perfil"), RouterPathNode("config")]
-        parts = path.components(separatedBy: "/").filter{ $0 != "" }.map{ RouterPathNode( $0 ) }
-    }
-
-    public init ( from: [RouterPathNode] ) {
-        parts = from
-    }
-    
-    func is_empty ( ) -> Bool { return parts.count == 0 }
-    
-    public func index_part ( ) -> String { return parts[ 0 ].name }
-    public func starts_with_var ( ) -> Bool { return parts.count > 0 && parts[ 0 ].is_var }
-    public func starts_with_regex ( ) -> Bool { return parts.count > 0 && parts[ 0 ].regex != nil }
-    public func drop_first ( ) -> RouterPath { return RouterPath( from: Array( parts.dropFirst() ) ) }
-    
-    func match ( _ rhs: RouterPath, _ vars: inout RouterPathVars ) -> RouterPathDiff? {
-        var common: [RouterPathNode] = []
-        
-        let optional_parts = parts.filter{ p in p.is_optional }.count
-        
-        if parts.count - optional_parts > rhs.parts.count { return nil }
-        
-        for i in Array(0..<parts.count) {
-            let p = parts[ i ]
-            
-            if i >= rhs.parts.count {
-                if p.is_optional {
-                    common.append( p )
-                    continue
-                } else {
-                    return nil
-                }
-            }
-            
-            if !p.match( rhs.parts[ i ] ) {
-                return nil
-            }
-            
-            if p.is_var {
-                vars[ p.key ] = rhs.parts[ i ].name
-            }
-            
-            common.append( p )
-        }
-        
-        let j = min( parts.count, rhs.parts.count )
-        
-        return ( common: RouterPath( from: common )
-               , left  : RouterPath( from: Array( parts[ common.count ..< parts.count ] ) )
-               , right : RouterPath( from: Array( rhs.parts[  j ..< rhs.parts.count  ] ) ) )
-    }
-    
-
-    func diff ( _ rhs: RouterPath ) -> RouterPathDiff {
-        var common: [RouterPathNode] = []
-        let max_len = min( parts.count, rhs.parts.count )
-        
-        func rest ( _ j: Int ) -> RouterPathDiff {
-            return ( common: RouterPath( from: common )
-                   , left  : RouterPath( from: Array( parts[ j ..< parts.count ] ) )
-                   , right : RouterPath( from: Array( rhs.parts[  j ..< rhs.parts.count  ] ) ) )
-        }
-        
-        for i in Array(0..<max_len) {
-            let left  = parts[ i ]
-            let right = rhs.parts[ i ]
-            
-            if left.name != right.name {
-                return rest( i )
-            }
-            
-            common.append( parts[ i ] )
-        }
-        
-        return rest( max_len )
-    }
-    
-    public func join ( _ extra: RouterPath ) {
-        parts.append(contentsOf: extra.parts )
-    }
-
-    public func joining ( _ extra: RouterPath ) -> RouterPath {
-        return RouterPath( from: parts + extra.parts )
-    }
-
-    func debug_path ( ) -> String {
-        return parts.count == 0 ? "/" : parts.map{ $0.name }.joined(separator: "/")
-        // let regularAnswer = parts.count == 0 ? "Empty (will be /)" : parts.map{ $0.name }.joined(separator: "/")
-        // var debugAnswer = "  # parts: \(parts.count) "
-        // for i in Array(0..<parts.count) {
-        //     let p = parts[ i ]
-        //     debugAnswer += " '\(p.name)' "
-        // }
-        // return regularAnswer + " -> " + debugAnswer
-    }
-}
-
 public enum EndpointMethod: String
 {
     case GET     = "GET"
@@ -241,7 +66,7 @@ public class EndpointPath
 public typealias SyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) throws -> Any?
 public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) async throws -> Any?
 
-public typealias MethodEndpointCompletionBlock = ( Any?, Error? ) -> Void
+public typealias MethodEndpointCompletionBlock = ( Any?, Error?, RouterContext? ) -> Void
 
 protocol MethodEndpointExecutionProtocol {
     func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
@@ -266,11 +91,11 @@ public struct MethodEndpoint
                 let result = try cb( ctx )
                 try ctx.didExecute()
                 
-                completion( result, nil )
+                completion( result, nil, ctx )
             }
             catch {
                 Log.error( "\(error)" )
-                completion( nil, error )
+                completion( nil, error, nil )
             }
         }
     }
@@ -293,11 +118,11 @@ public struct MethodEndpoint
                     let result = try await cb( ctx )
                     try await ctx.didExecute()
                     
-                    completion( result, nil )
+                    completion( result, nil, ctx )
                 }
                 catch {
                     Log.error( "\(error)" )
-                    completion( nil, error )
+                    completion( nil, error, nil )
                 }
             }
         }
@@ -324,7 +149,7 @@ public struct MethodEndpoint
 }
 
 // MARK: - Endpoint
-public class Endpoint : EndpointPath
+public class Endpoint// : EndpointPath
 {
 //   public typealias RouterClass = RouterContextProtocol
         
@@ -393,7 +218,7 @@ public class Endpoint : EndpointPath
         methods[ method ] = MethodEndpoint(async_cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
         return self
     }
-
+/*
     override public func match ( _ method: EndpointMethod, _ url: RouterPath, _ vars: inout RouterPathVars ) -> RouterPathDiff? {
         if methods[ method ] == nil { return nil }
 
@@ -436,5 +261,7 @@ public class Endpoint : EndpointPath
             print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str) // + "\(String(format: "%p", address))")
         }
     }
+ 
+ */
 }
 

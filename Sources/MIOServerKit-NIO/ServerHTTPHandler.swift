@@ -66,35 +66,32 @@ class ServerHTTPHandler: ChannelInboundHandler
         var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request!.method.rawValue )!
                 
-        let endpoint = router.root.match( method == .HEAD ? EndpointMethod.GET : method
-                                 , RouterPath( path )
-                                 , &route_vars )
-
-        if endpoint != nil && endpoint!.methods[ method ] != nil
-        {
-            if method == .HEAD { response.status(.ok); completion(nil, nil) }
-            else {
-                request.parameters = route_vars
-                let endpoint_spec = endpoint!.methods[ method ]!
-                endpoint_spec.run( serverSettings, request, response, completion )
-            }
-        }
-        else {
-            completion( nil, ServerError.endpointNotFound( path, method.rawValue ) )
-        }
-    }
-           
-    private func complete_response(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {
-        self.state.responseComplete()
-
-        let promise = self.keepAlive ? promise : (promise ?? context.eventLoop.makePromise())
-        if !self.keepAlive {
-            promise!.futureResult.whenComplete { (_: Result<Void, Error>) in context.close(promise: nil) }
-        }
-
-        context.writeAndFlush(self.wrapOutboundOut(.end(trailers)), promise: promise)
-    }
+        let endpoint = router.root.match( RouterPath( path ), &route_vars )
         
+        if endpoint == nil { completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil ); return }
+        
+        response.headers[ "Access-Control-Allow-Origin" ] = "*"
+        response.headers[ "Access-Control-Allow-Methods" ] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        if let headers = request.headers[ "Access-Control-Request-Headers" ] {
+            response.headers[ "Access-Control-Allow-Headers" ] = headers
+        }
+        
+        if method == .OPTIONS {
+            response.status(.noContent)
+//            response.headers[ "Allow" ] = Array( endpoint!.methods.keys ).map(\.rawValue).joined(separator: ", ") + ", HEAD"
+            completion(nil, nil, nil)
+        }
+        else if method == .HEAD {
+            response.status(.ok)
+            completion(nil, nil, nil)
+        }
+        else if endpoint!.methods[ method ] != nil {
+            request.parameters = route_vars
+            let endpoint_spec = endpoint!.methods[ method ]!
+            endpoint_spec.run( serverSettings, request, response, completion )
+        }
+    }
+                   
     func channelRead(context: ChannelHandlerContext, data: NIOAny) 
     {
         let reqPart = self.unwrapInboundIn(data)
@@ -122,22 +119,21 @@ class ServerHTTPHandler: ChannelInboundHandler
             
         case .end:
             self.state.requestComplete()
-            
-            self.buffer.clear()
+                        
             request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
-            dispatch_request() { result, error in
+            dispatch_request() { result, error, handler in
                 if context.eventLoop.inEventLoop {
-                    self.handle_response( result: result, error: error, context: context )
+                    self.handle_response( result: result, error: error, context: context, handlerContext: handler )
                 } else {
                     context.eventLoop.execute {
-                        self.handle_response( result: result, error: error, context: context )
+                        self.handle_response( result: result, error: error, context: context, handlerContext: handler )
                     }
                 }
             }
         }
     }
     
-    func handle_response( result: Any?, error:Error?, context: ChannelHandlerContext )
+    func handle_response( result: Any?, error:Error?, context: ChannelHandlerContext, handlerContext: RouterContext? )
     {
         self.buffer.clear()
         
@@ -146,7 +142,8 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
         else {
             do {
-                switch result {
+                let value = try handlerContext?.responseBody( result ) ?? result
+                switch value {
                 case let d as Data  : self.buffer.writeData(d)
                 case let s as String: self.buffer.writeString(s)
                 case let arr as [Any]:
@@ -159,19 +156,18 @@ class ServerHTTPHandler: ChannelInboundHandler
                     self.buffer.writeData(data)
                 default: break
                 }
-                response.status = .ok
             }
             catch {
-                handle_error(error: error, context: context)
+                handle_error( error: error, context: context )
             }
         }
         
-        self.write_response( context: context )
+        self.write_response( context: context, handlerContext: handlerContext )
         self.complete_response(context, trailers: nil, promise: nil)
         
         // Clean up
-        self.infoSavedBodyBytes = 0
-        self.infoSavedBodyBuffer = nil
+//        self.infoSavedBodyBytes = 0
+//        self.infoSavedBodyBuffer = nil
     }
     
     // Method to handle errors
@@ -187,10 +183,14 @@ class ServerHTTPHandler: ChannelInboundHandler
     }
 
     // Helper method to write the response on the event loop thread
-    private func write_response( context: ChannelHandlerContext )
+    private func write_response( context: ChannelHandlerContext, handlerContext: RouterContext? )
     {
         var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response!.status)
         
+        for (k,v) in handlerContext?.extraResponseHeaders( ) ?? [:] {
+            responseHead.headers.add(name: k, value: v)
+        }
+                
         for (k, v) in response!.headers {
             responseHead.headers.add(name: k, value: v)
         }
@@ -204,8 +204,20 @@ class ServerHTTPHandler: ChannelInboundHandler
         let content = HTTPServerResponsePart.body(.byteBuffer(buffer!.slice()))
         context.write(self.wrapOutboundOut(content), promise: nil)
 
-        context.flush()
+//        context.flush()
     }
+    
+    private func complete_response(_ context: ChannelHandlerContext, trailers: HTTPHeaders?, promise: EventLoopPromise<Void>?) {
+        self.state.responseComplete()
+
+        let promise = self.keepAlive ? promise : (promise ?? context.eventLoop.makePromise())
+        if !self.keepAlive {
+            promise!.futureResult.whenComplete { (_: Result<Void, Error>) in context.close(promise: nil) }
+        }
+
+        context.writeAndFlush(self.wrapOutboundOut(.end(trailers)), promise: promise)
+    }
+
 
 
     func channelReadComplete(context: ChannelHandlerContext) {

@@ -50,9 +50,9 @@ public class RouterPathNode: Equatable {
     
     public func match ( _ node: RouterPathNode ) -> Bool {
         return is_var && node.is_var ? name == node.name
-             : regex != nil ?
-               regex!.firstMatch( in: node.name, options: [], range: NSRange( location: 0, length: node.name.count ) ) != nil
-             : is_var || name == node.name
+                                     : regex != nil ?
+                                                    regex!.firstMatch( in: node.name, options: [], range: NSRange( location: 0, length: node.name.count ) ) != nil
+                                                    : is_var || name == node.name
     }
 }
 

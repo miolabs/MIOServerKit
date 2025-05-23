@@ -7,14 +7,14 @@
 //
 
 import Foundation
+import MIOCoreLogger
 
 open class Router
 {
-    public var root: EndpointTreeNode
+    public var root: EndpointTree
 
     public init ( ) {
         root = EndpointTree( )
-        root.is_root = true
     }
     
     // public func endpointOld ( _ url: String ) -> Endpoint
@@ -32,11 +32,12 @@ open class Router
 
     public func nop() -> Void  // just to be used in tests to set breakpoints and dump the state of this object
     {
-        print("nop")
+        Log.debug("nop")
     }
 
     public func endpoint ( _ url: String ) -> Endpoint
     {
+        /*
         var abs_path : RouterPath
         if (root.value == nil){
             abs_path = RouterPath( url )
@@ -52,15 +53,29 @@ open class Router
         root.insert( newEndpoint )
         
         return newEndpoint
+        */
+        
+        let path = RouterPath( url )
+        var (node,diff_path) = root.find( path: path )
+        if node == nil {
+            node = root.insert( path: path )
+        }
+        else {
+            node = node!.insert( path: diff_path )
+        }
+        
+        node!.endpoint = Endpoint()
+        return node!.endpoint!
     }
 
     public func router ( _ url: String ) -> Router 
     {
+/*
         let path = RouterPath( url )
         var node = root.find( path )
+        Log.debug("Node '\(url)' \(node == nil ? "NOT" : "")found")
         
         if node == nil {
-            print("router: node '\(url)' NOT found")
             root.insert( EndpointPath( url ) )
             node = root.find( path )
             // if node == nil {
@@ -69,9 +84,6 @@ open class Router
             //return node!.value as! Router
             //return self
         }
-        else {
-            print("router: node '\(url)' was found")
-        }
         
         let ret = Router( )
         ret.root.is_root = false
@@ -79,6 +91,21 @@ open class Router
         //ret.root.value = EndpointPath( )
         //node!.insert_subnode( ret.root )
         
+        return ret
+ */
+        let path = RouterPath( url )
+        var (node,diff) = root.find( path: path )
+        Log.debug("Node '\(url)' \(node == nil ? "NOT" : "")found")
+        
+        if node == nil {
+            node = root.insert( path: path )
+        }
+        else {
+            node = node!.insert( path: diff )
+        }
+        
+        let ret = Router( )
+        ret.root = node!
         return ret
     }
 

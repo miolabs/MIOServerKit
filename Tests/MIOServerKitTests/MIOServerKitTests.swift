@@ -232,6 +232,27 @@ final class MIOServerKitTests: XCTestCase {
         XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
         XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
     }
+    
+    func testEndpointRealCase31 ( ) {
+        let route_home = Endpoint( "/" ).get( nop )
+        let route_hook = Endpoint( "/hook/version" ).get( nop )
+        let route_hook_version = Endpoint( "/hook/version" ).get( nop )
+        
+        let tree = EndpointTree( )
+        tree.insert( route_home )
+        tree.insert( route_hook_version )
+        
+        tree.insert( EndpointPath( "/hook" ) )
+        let node = tree.find( RouterPath( "/hook" ) )!
+        let route_hook = Endpoint( "/" ).get( nop )
+        node.insert( route_hook )
+        
+        var route_vars: RouterPathVars = [:]
+        XCTAssertTrue( tree.match( .GET, RouterPath( "/"              ), &route_vars ) === route_home )
+        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
+        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
+    }
+
 }
     
 
