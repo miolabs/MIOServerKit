@@ -266,19 +266,12 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
 //    }
         
     public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
-        let json = bodyAsJSON()
-        if json == nil {
-            if optional { return nil }
+        guard let json = bodyAsJSON() else {
             throw ServerError.missingJSONBody( )
         }
 
-        if let dict = json as? [ String:Any ] {
-
-            if let value = dict[ name ] as? T {
-                return value
-            }
-            else if optional { return nil }
-            else { throw ServerError.fieldNotFound( name ) }
+        if let value = ( json as? [ String:Any ] )?[ name ] as? T {
+            return value
         }
 
         if optional { return nil }
