@@ -77,7 +77,8 @@ class ServerHTTPHandler: ChannelInboundHandler
         response.headers[ "Access-Control-Allow-Origin" ] = "*"
         response.headers[ "Access-Control-Allow-Methods" ] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
         response.headers[ "Access-Control-Max-Age" ] = "5"
-        response.headers[ "Access-Control-Allow-Headers" ] = request.headers[ "Access-Control-Request-Headers" ] ?? "Content-Type"
+//        response.headers[ "Access-Control-Allow-Headers" ] = request.headers[ "Access-Control-Request-Headers" ] ?? "Content-Type"
+        response.headers[ "Access-Control-Allow-Headers" ] = "authorization,content-type,dl-place-id,dl-worker-id,dl-worker-name,result-type"
         
         if method == .OPTIONS {
             response.status(.noContent)
