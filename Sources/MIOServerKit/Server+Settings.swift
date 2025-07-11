@@ -23,8 +23,8 @@ public struct ServerSettings
     }
 }
 
-extension Server {
-    
+extension Server
+{
     static func _load_settings( _ settings:[String:Any]? = nil ) -> ServerSettings
     {
         // TODO: Load App.plist settings

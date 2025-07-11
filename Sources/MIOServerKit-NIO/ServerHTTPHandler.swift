@@ -68,17 +68,24 @@ class ServerHTTPHandler: ChannelInboundHandler
                 
         let endpoint = router.root.match( RouterPath( path ), &route_vars )
         
-        if endpoint == nil { completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil ); return }
+        if endpoint == nil {
+            completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )
+            return
+        }
         
         response.headers[ "Access-Control-Allow-Origin" ] = "*"
-        response.headers[ "Access-Control-Allow-Methods" ] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers[ "Access-Control-Allow-Methods" ] = "GET, POST, PUT, PATCH, DELETE"
+        response.headers[ "Access-Control-Allow-Credentials" ] = "true"
         if let headers = request.headers[ "Access-Control-Request-Headers" ] {
             response.headers[ "Access-Control-Allow-Headers" ] = headers
+        }
+        else {
+            response.headers[ "Access-Control-Allow-Headers" ] = "Content-Type"
         }
         
         if method == .OPTIONS {
             response.status(.noContent)
-//            response.headers[ "Allow" ] = Array( endpoint!.methods.keys ).map(\.rawValue).joined(separator: ", ") + ", HEAD"
+            response.headers[ "Allow" ] = Array( endpoint!.methods.keys ).map(\.rawValue).joined(separator: ", ") + ", HEAD"
             completion(nil, nil, nil)
         }
         else if method == .HEAD {
@@ -89,6 +96,9 @@ class ServerHTTPHandler: ChannelInboundHandler
             request.parameters = route_vars
             let endpoint_spec = endpoint!.methods[ method ]!
             endpoint_spec.run( serverSettings, request, response, completion )
+        }
+        else {
+            completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )
         }
     }
                    

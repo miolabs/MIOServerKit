@@ -24,8 +24,7 @@ open class Server
     /// ```swift
     ///  let router = MIORouter()
     /// ```
-    public init( routes: Router, settings: [String:Any]? = nil )
-    {
+    public init( routes: Router, settings: [String:Any]? = nil ) {
         _router = routes
         _settings = Server._load_settings( settings )
     }
