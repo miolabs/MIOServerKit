@@ -12,6 +12,8 @@ import NIOHTTP1
 import NIOFoundationCompat
 import MIOCore
 import MIOServerKit
+import MIOCoreLogger
+
 
 class ServerHTTPHandler: ChannelInboundHandler
 {
@@ -79,6 +81,8 @@ class ServerHTTPHandler: ChannelInboundHandler
         response.headers[ "Access-Control-Max-Age" ] = "5"
 //        response.headers[ "Access-Control-Allow-Headers" ] = request.headers[ "Access-Control-Request-Headers" ] ?? "Content-Type"
         response.headers[ "Access-Control-Allow-Headers" ] = "authorization,content-type,dl-place-id,dl-worker-id,dl-worker-name,result-type"
+        Log.debug( "Endpoint: \(method.rawValue) \(path)" )
+        Log.trace( "Headers: \(request.headers)" )
         
         if method == .OPTIONS {
             response.status(.noContent)

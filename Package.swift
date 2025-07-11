@@ -97,6 +97,7 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "MIOCore", package: "MIOCore"),                
                 .product(name: "MIOCoreContext", package: "MIOCore"),
+                .product(name: "MIOCoreLogger", package: "MIOCore"),
 //                .product(name: "Fortify", package: "Fortify" )
             ]
         ),
