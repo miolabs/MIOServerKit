@@ -13,7 +13,7 @@ import MIOCore
 open class RouterResponse
 {
     public var status:HTTPResponseStatus = .ok
-    public var headers:[String:String] = [:]
+    public var headers:HTTPHeaders = HTTPHeaders()
     
     public var body:Any? = nil
  

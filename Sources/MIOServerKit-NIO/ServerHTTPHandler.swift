@@ -74,19 +74,23 @@ class ServerHTTPHandler: ChannelInboundHandler
             completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )
             return
         }
+
+        // TODO: Make a cors plugin so this can be setup externally
+//        response.headers.add(name: .accessControlAllowCredentials, value: "true" )
+        response.headers.add(name: .accessControlAllowOrigin, value: "*")
+        response.headers.add(name: .accessControlAllowMethods, value: "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD" )
+        response.headers.add(name: .accessControlMaxAge, value: "5" )
+        response.headers.add(name: .vary, value: "Origin" )
         
-        //        response.headers[ "Access-Control-Allow-Credentials" ] = "true"
-        response.headers[ "Access-Control-Allow-Origin" ] = "*"
-        response.headers[ "Access-Control-Allow-Methods" ] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
-        response.headers[ "Access-Control-Max-Age" ] = "5"
-//        response.headers[ "Access-Control-Allow-Headers" ] = request.headers[ "Access-Control-Request-Headers" ] ?? "Content-Type"
-        response.headers[ "Access-Control-Allow-Headers" ] = "authorization,content-type,dl-place-id,dl-worker-id,dl-worker-name,result-type"
+        let values = request.headers[ .accessControlRequestHeaders ].isEmpty ? ["Context-Type"] : request.headers[ .accessControlRequestHeaders ]
+        response.headers.add(name: .accessControlAllowHeaders, value: values.joined(separator: ",") )
+
         Log.debug( "Endpoint: \(method.rawValue) \(path)" )
         Log.trace( "Headers: \(request.headers)" )
         
         if method == .OPTIONS {
             response.status(.noContent)
-            response.headers[ "Allow" ] = Array( endpoint!.methods.keys ).map(\.rawValue).joined(separator: ", ") + ", HEAD"
+            response.headers.add(name: .allow, value: Array( endpoint!.methods.keys ).map(\.rawValue).joined(separator: ", ") + ", HEAD" )
             completion(nil, nil, nil)
         }
         else if method == .HEAD {
@@ -158,11 +162,11 @@ class ServerHTTPHandler: ChannelInboundHandler
                 case let d as Data  : self.buffer.writeData(d)
                 case let s as String: self.buffer.writeString(s)
                 case let arr as [Any]:
-                    self.response.headers["Content-Type"] = "application/json"
+                    self.response.headers.add(name: .contentType, value: "application/json" )
                     let data = try MIOCoreJsonValue(withJSONObject: arr)
                     self.buffer.writeData(data)
                 case let dic as [String:Any]:
-                    self.response.headers["Content-Type"] = "application/json"
+                    self.response.headers.add(name: .contentType, value: "application/json" )
                     let data = try MIOCoreJsonValue(withJSONObject: dic)
                     self.buffer.writeData(data)
                 default: break

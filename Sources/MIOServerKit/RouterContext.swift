@@ -292,10 +292,10 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         case let d as Data  : return d
         case let s as String: return s.data(using: .utf8)
         case let arr as [Any]:
-            self.response.headers["Content-Type"] = "application/json"
+            self.response.headers.add(name: .contentType, value: "application/json" )
             return try MIOCoreJsonValue(withJSONObject: arr)
         case let dic as [String:Any]:
-            self.response.headers["Content-Type"] = "application/json"
+            self.response.headers.add(name: .contentType, value: "application/json" )
             return try MIOCoreJsonValue(withJSONObject: dic)
         default: return nil
         }
