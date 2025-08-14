@@ -8,56 +8,65 @@
 import Foundation
 import MIOCore
 import MIOCoreLogger
+import ArgumentParser
 
-public struct ServerSettings
+struct ServerOptionParsableCommand : ParsableCommand
 {
-    var _settings : [String:Any] = [:]
-        
-    public var name:String { return ( _settings[ "ServerName" ] as? String ) ?? "NO_NAME" }
-    public var version:String { return ( _settings[ "Version" ] as? String ) ?? "x.x.x" }
-    public var documentsPath:String { ( _settings[ "DocPath" ] as? String ) ?? "/dev/null" }
+    @Option(name: .shortAndLong, help: "The path server files.")
+    var serverPath: String?
+
+    @Option(name: .shortAndLong, help: "The path of document files.")
+    var documentPath: String?
     
-    mutating func _load_settings() {
-        // TODO: Load App.plist settings
-        _settings[ "DocPath" ] = MCEnvironmentVar("DOCUMENTS_PATH") ?? "/dev/null"
-    }
+    @Option(name: .shortAndLong, help: "The port of server.")
+    var port: Int?
 }
 
-extension Server
+open class ServerSettings
 {
-    static func _load_settings( _ settings:[String:Any]? = nil ) -> ServerSettings
+    public let name:String
+    public let version:String
+    public let documentsPath:String
+    public let serverPath:String
+    
+    required public init( )
     {
-        // TODO: Load App.plist settings
-        var settings_dict : [String:Any] = settings ?? [:]
-        if !settings_dict.keys.contains( "DocPath" ) {
-            settings_dict[ "DocPath" ] = MCEnvironmentVar("DOCUMENTS_PATH") ?? "/dev/null"
-        }
+        let name: String? = nil
+        let version: String? = nil
+        var documentsPath: String? = nil
+        var serverPath: String? = nil
+
+        // Parse options - has priority over the options adding in code
+        let command_options = ( try? ServerOptionParsableCommand.parse( ) ) ?? ServerOptionParsableCommand()
+        if let dp = command_options.documentPath { documentsPath = dp }
+        if let sp = command_options.serverPath { serverPath = sp }
+
+        documentsPath = documentsPath ?? MCEnvironmentVar("DOCUMENTS_PATH") ?? FileManager().currentDirectoryPath
+        serverPath = serverPath ?? MCEnvironmentVar("SERVER_PATH") ?? FileManager().currentDirectoryPath
+            
+        // Load App.plist
+        let app_settings_dict:[String:Any] = ( try? ServerSettings.loadPropertyList( path: serverPath! + "/App.plist" ) ) ?? [:]
         
-        _load_settings_app_list( settings: &settings_dict )
+        self.name = app_settings_dict[ "ServerName" ] as? String ?? name ?? "NO_NAME"
+        self.version = app_settings_dict[ "Version" ] as? String ?? version ?? "x.x.x"
+        self.documentsPath = documentsPath!
+        self.serverPath = serverPath!
         
-        return ServerSettings(_settings: settings_dict )
+        Log.debug( "Server settings: name=\(name!), version=\(version!), documentsPath=\(documentsPath!), serverPath=\(serverPath!)" )
     }
     
-    static func _load_settings_app_list( settings:inout [String:Any]) {
-        
-        if let server_path = settings[ "ServerPath" ] as? String {
-            let path = server_path.appending("/App.plist")
-            guard let xml = FileManager.default.contents( atPath: path ) else {
-                Log.warning("Server app.plist not found in path: \(path)")
-                return
-            }
-            
-            do {
-                guard let items = try PropertyListSerialization.propertyList(from: xml, options: .mutableContainersAndLeaves, format: nil) as? [String:Any] else {
-                    Log.warning("Server app.plist could not be parsed")
-                    return
-                }
-                
-                settings.merge(items) { (_, new) in new }
-            }
-            catch {
-                Log.error( "\(error)")
-            }
+    static public func loadPropertyList<T>( path: String ) throws -> T
+    {
+        guard let xml = FileManager.default.contents( atPath: path ) else {
+            Log.warning("Property list file not found in path: \(path)")
+            throw ServerError.loadingSettings( "Property list file not found in path: \(path)" )
         }
+            
+        guard let items = try PropertyListSerialization.propertyList(from: xml, options: .mutableContainersAndLeaves, format: nil) as? T else {
+            Log.warning("File \(path) could not be parsed" )
+            throw ServerError.loadingSettings( "File \(path) could not be parsed" )
+        }
+        
+        return items
     }
 }

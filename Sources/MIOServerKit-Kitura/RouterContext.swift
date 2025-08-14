@@ -78,7 +78,6 @@ public protocol RouterContextProtocol {
     func bodyParam<T> (_ name: String, optional: Bool) throws -> T?
 }
 
-
 @objc open class RouterContext : MIOCoreContext, RouterContextProtocol
 {
     public var request: MSKRouterRequest

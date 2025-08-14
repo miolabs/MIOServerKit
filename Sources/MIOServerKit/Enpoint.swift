@@ -69,7 +69,7 @@ public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: 
 public typealias MethodEndpointCompletionBlock = ( Any?, Error?, RouterContext? ) -> Void
 
 protocol MethodEndpointExecutionProtocol {
-    func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
+    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
 }
 
 public struct MethodEndpoint
@@ -83,10 +83,10 @@ public struct MethodEndpoint
             self.cb = cb
         }
         
-        func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
         {
             do {
-                let ctx = try T.init( settings, request, response )
+                let ctx = try T.init( request, response )
                 try ctx.willExecute()
                 let result = try cb( ctx )
                 try ctx.didExecute()
@@ -109,11 +109,11 @@ public struct MethodEndpoint
             self.cb = cb
         }
         
-        func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
         {
             Task {
                 do {
-                    let ctx = try T.init( settings, request, response )
+                    let ctx = try T.init( request, response )
                     try await ctx.willExecute()
                     let result = try await cb( ctx )
                     try await ctx.didExecute()
@@ -143,8 +143,8 @@ public struct MethodEndpoint
         self.extra_url = extra_url
     }
 
-    public func run( _ settings: ServerSettings, _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
-        wrapper.run( settings, request, response, completion )
+    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
+        wrapper.run( request, response, completion )
     }
 }
 

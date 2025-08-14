@@ -55,11 +55,9 @@ class ServerHTTPHandler: ChannelInboundHandler
     var response:RouterResponse!
         
     private let router: Router
-    private let serverSettings: ServerSettings
     
-    public init( router:Router, settings: ServerSettings ) {
+    public init( router:Router ) {
         self.router = router
-        self.serverSettings = settings
     }
     
     private func dispatch_request( completion: @escaping MethodEndpointCompletionBlock )
@@ -100,7 +98,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         else if endpoint!.methods[ method ] != nil {
             request.parameters = route_vars
             let endpoint_spec = endpoint!.methods[ method ]!
-            endpoint_spec.run( serverSettings, request, response, completion )
+            endpoint_spec.run( request, response, completion )
         }
         else {
             completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )

@@ -23,6 +23,7 @@ public enum ServerError: Error
     case fieldNotFound  (_ description  : String, _ functionName : String = #function )
     case invalidBodyData(_ parameterName: String, _ functionName: Any = #function)
     case invalidContext (_ functionName: String = #function)
+    case loadingSettings (_ message:String, _ functionName: String = #function)
 }
 
 extension ServerError: LocalizedError
@@ -37,6 +38,7 @@ extension ServerError: LocalizedError
         case let .fieldNotFound( description, _ ): return "Field not found: \(description)."
         case let .invalidBodyData(parameterName, _): return "\(parameterName) has invalid body data."
         case .invalidContext(_): return "Invalid context."
+        case .loadingSettings( let message, _ ): return "\(message)"
         }
     }
     
@@ -64,6 +66,9 @@ extension ServerError: LocalizedError
             
             case let .endpointNotFound( path, method, functionName ):
             return "Endpoint not found. \(method) \(path). \(functionName)"
+            
+            case let .loadingSettings( message, functionName ):
+            return "\(message). \(functionName)"
         }
     }
 }

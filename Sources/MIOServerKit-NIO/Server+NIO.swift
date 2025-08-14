@@ -13,8 +13,8 @@ import NIOHTTP1
 import MIOServerKit
 import MIOCoreLogger
 
-open class NIOServer : Server
-{        
+open class NIOServer<T: ServerSettings> : Server<T>
+{
     deinit {
         try! group.syncShutdownGracefully()
     }
@@ -25,9 +25,9 @@ open class NIOServer : Server
     var channel: Channel!
     var alreadyRunning = DispatchSemaphore(value: 0)
     
-    open override func run ( port:Int )
+    open override func run ( port: Int )
     {
-        super.run(port: port)
+        super.run( port: port )
         
         bootstrap = ServerBootstrap(group: group)
         // Specify backlog and enable SO_REUSEADDR for the server itself
@@ -63,7 +63,7 @@ open class NIOServer : Server
     
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
-            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, settings: self.settings ) )
+            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router ) )
         }
     }
     
