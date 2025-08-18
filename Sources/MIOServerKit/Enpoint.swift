@@ -92,6 +92,7 @@ public struct MethodEndpoint
                 try ctx.didExecute()
                 
                 completion( result, nil, ctx )
+                Log.debug( "Syncrhonous endpoint executed successfully." )
             }
             catch {
                 Log.error( "\(error)" )
@@ -119,6 +120,7 @@ public struct MethodEndpoint
                     try await ctx.didExecute()
                     
                     completion( result, nil, ctx )
+                    Log.debug( "Asyncrhonous endpoint executed successfully." )
                 }
                 catch {
                     Log.error( "\(error)" )

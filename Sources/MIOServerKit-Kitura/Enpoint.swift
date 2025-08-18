@@ -196,7 +196,7 @@ public class EndpointTreeLeaf {
     public func starts_with_regex ( ) -> Bool { return path.starts_with_regex() }
     
     public func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
-        Log.debug( "\("".padding(toLength: spaces, withPad: " ", startingAt: 0) + prefix + path.debug_path() )" )
+        Log.debug( "\("".padding(toLength: spaces, withPad: " ", startingAt: 0) + prefix + self.path.debug_path() )" )
     }
 }
 

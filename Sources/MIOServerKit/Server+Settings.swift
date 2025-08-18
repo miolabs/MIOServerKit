@@ -40,14 +40,16 @@ open class ServerSettings
         let command_options = ( try? ServerOptionParsableCommand.parse( ) ) ?? ServerOptionParsableCommand()
         if let dp = command_options.documentPath { documentsPath = dp }
         if let sp = command_options.serverPath { serverPath = sp }
-
+        
         documentsPath = documentsPath ?? MCEnvironmentVar("DOCUMENTS_PATH") ?? FileManager().currentDirectoryPath
         serverPath = serverPath ?? MCEnvironmentVar("SERVER_PATH") ?? FileManager().currentDirectoryPath
             
         // Load App.plist
         let app_settings_dict:[String:Any] = ( try? ServerSettings.loadPropertyList( path: serverPath! + "/App.plist" ) ) ?? [:]
         
-        self.name = app_settings_dict[ "ServerName" ] as? String ?? name ?? "NO_NAME"
+        let file_name = CommandLine.arguments.first?.components(separatedBy: "/").last
+        
+        self.name = app_settings_dict[ "ServerName" ] as? String ?? name ?? file_name ?? "NO_NAME"
         self.version = app_settings_dict[ "Version" ] as? String ?? version ?? "x.x.x"
         self.documentsPath = documentsPath!
         self.serverPath = serverPath!
