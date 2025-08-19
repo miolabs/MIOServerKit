@@ -17,8 +17,7 @@ let package = Package(
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
+        // .package(url: /* package url */, from: "1.0.0"),        
         .package(url: "https://github.com/Kitura/Kitura.git", from: "2.9.200"),
         .package(url: "https://github.com/Kitura/HeliumLogger.git", from: "1.9.200"),
         .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
@@ -76,7 +75,6 @@ let package = Package(
         .target(
             name: "MIOServerKit-Kitura",
             dependencies: [
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 "Kitura",
                 "HeliumLogger",
                 .product(name: "KituraCORS", package: "Kitura-CORS"),
@@ -98,7 +96,6 @@ let package = Package(
                 .product(name: "MIOCore", package: "MIOCore"),                
                 .product(name: "MIOCoreContext", package: "MIOCore"),
                 .product(name: "MIOCoreLogger", package: "MIOCore"),
-//                .product(name: "Fortify", package: "Fortify" )
             ]
         ),
         .testTarget(
