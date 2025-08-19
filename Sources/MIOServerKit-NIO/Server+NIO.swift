@@ -13,7 +13,7 @@ import NIOHTTP1
 import MIOServerKit
 import MIOCoreLogger
 
-open class NIOServer<T: ServerSettings> : Server<T>
+open class NIOServer: Server
 {
     deinit {
         try! group.syncShutdownGracefully()

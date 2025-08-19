@@ -9,18 +9,16 @@ import MIOCoreLogger
 
 public let uuid_regex = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
-open class Server < S:ServerSettings >
+open class Server
 {
     public let router:Router
-    public let settings: S
 
-    public init( routes: Router, settings: S? = nil ) {
+    public init( routes: Router ) {
         self.router = routes
-        self.settings = settings ?? S()
     }
     
     open func run ( port: Int ) {
-        Log.info( "\(self.settings.name) \(self.settings.version) running on port \(port)" )
+        Log.info( "Server running on port \(port)" )
     }
 }
 
