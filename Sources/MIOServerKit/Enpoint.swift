@@ -63,8 +63,8 @@ public class EndpointPath
 
 // MARK: - MethodEndpoint
 
-public typealias SyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) throws -> Any?
-public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = ( _ context: T ) async throws -> Any?
+public typealias SyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) throws -> Any?
+public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) async throws -> Any?
 
 public typealias MethodEndpointCompletionBlock = ( Any?, Error?, RouterContext? ) -> Void
 
@@ -84,7 +84,9 @@ public struct MethodEndpoint
             self.cb = cb
         }
         
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async { }
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async {
+            completion( nil, MIOCoreError.general( "Not implemented yet" ), nil )
+        }
         
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
         {
@@ -113,7 +115,9 @@ public struct MethodEndpoint
             self.cb = cb
         }
         
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) { }
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
+            completion( nil, MIOCoreError.general( "Not implemented yet" ), nil )
+        }
         
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async
         {
