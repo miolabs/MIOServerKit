@@ -11,19 +11,13 @@ let package = Package(
     products: [
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library( name: "MIOServerKit", targets: ["MIOServerKit"] ),
-        .library( name: "MIOServerKit-Kitura", targets: ["MIOServerKit-Kitura"] ),
-        .library( name: "MIOServerKit-NIO", targets: ["MIOServerKit-NIO"] ),
         .library( name: "MIOServerKitMacros", targets: ["MIOServerKitMacros"] ),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
         // .package(url: /* package url */, from: "1.0.0"),        
-        .package(url: "https://github.com/Kitura/Kitura.git", from: "2.9.200"),
-        .package(url: "https://github.com/Kitura/HeliumLogger.git", from: "1.9.200"),
-        .package(url: "https://github.com/Kitura/Kitura-CORS.git", from: "2.1.201"),
         .package(url: "https://github.com/miolabs/MIOCore.git", branch: "master"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.1"),
         .package(url: "https://github.com/apple/swift-syntax.git", from: "509.0.0"),
     ],
     targets: [
@@ -62,47 +56,16 @@ let package = Package(
             dependencies: [
                 .product(name: "MIOCore", package: "MIOCore"),
                 .product(name: "MIOCoreContext", package: "MIOCore"),
+                .product(name: "MIOCoreLogger", package: "MIOCore"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "Logging", package: "swift-log"),
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
             ]
         ),
         .testTarget(
             name: "MIOServerKitTests",
             dependencies: ["MIOServerKit"]
         ),
-
-        // MARK: - Kitura
-        .target(
-            name: "MIOServerKit-Kitura",
-            dependencies: [
-                "Kitura",
-                "HeliumLogger",
-                .product(name: "KituraCORS", package: "Kitura-CORS"),
-                .product(name: "MIOCore", package: "MIOCore"),
-                .product(name: "MIOCoreContext", package: "MIOCore"),
-//                .product(name: "Fortify", package: "Fortify" )
-            ]
-        ),
-        
-        // MARK: - Swift NIO
-        .target(
-            name: "MIOServerKit-NIO",
-            dependencies: [
-                "MIOServerKit",
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOFoundationCompat", package: "swift-nio"),
-                .product(name: "MIOCore", package: "MIOCore"),                
-                .product(name: "MIOCoreContext", package: "MIOCore"),
-                .product(name: "MIOCoreLogger", package: "MIOCore"),
-            ]
-        ),
-        .testTarget(
-            name: "MIOServerKitNIOTests",
-            dependencies: ["MIOServerKit-NIO"]
-        ),
-        
-
     ]
 )

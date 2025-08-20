@@ -19,7 +19,7 @@ public protocol RouterContextProtocol : AnyObject
     var request: RouterRequest { get }
     var response: RouterResponse { get }
     
-    init( _ request: RouterRequest, _ response: RouterResponse ) throws
+    init( _ request: RouterRequest, _ response: RouterResponse, values:[String:Any] ) throws
     
     func queryParam ( _ name: String ) -> String?
     func urlParam<T> ( _ name: String ) throws -> T
@@ -139,9 +139,10 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     public var request: RouterRequest
     public var response: RouterResponse
     
-    public required init ( _ request: RouterRequest, _ response: RouterResponse ) throws {
+    public required init ( _ request: RouterRequest, _ response: RouterResponse, values:[String:Any] = [:] ) throws {
         self.request        = request
         self.response       = response
+        super.init( values )
     }
     
     public func urlParam<T> ( _ name: String ) throws -> T {

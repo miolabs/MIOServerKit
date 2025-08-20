@@ -28,9 +28,14 @@ open class RouterRequest
     public var queryParameters: [String:String] { get { _query_parameters } }
     //    public var body: Data? { get { _body } }
     public var body:Data? = nil
-        
-        
-    public init( _ httpRequestHead: HTTPRequestHead ) 
+                
+    public init() {
+        _http_request_head = HTTPRequestHead(version: .http1_1, method: .GET, uri: "")
+        _url = URL( string: "" )!
+        _query_parameters = [:]
+    }
+    
+    public init( _ httpRequestHead: HTTPRequestHead )
     {
         _http_request_head = httpRequestHead
         _url = URL( string: httpRequestHead.uri )!

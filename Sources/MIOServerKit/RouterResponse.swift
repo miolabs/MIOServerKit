@@ -19,6 +19,10 @@ open class RouterResponse
  
     let _http_request_head: HTTPRequestHead
     
+    public init() {
+        _http_request_head = HTTPRequestHead(version: .http1_1, method: .GET, uri: "")
+    }
+    
     public init( _ httpRequestHead: HTTPRequestHead ) {
         _http_request_head = httpRequestHead
     }

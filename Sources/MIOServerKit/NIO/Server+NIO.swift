@@ -10,7 +10,6 @@ import Foundation
 
 import NIO
 import NIOHTTP1
-import MIOServerKit
 import MIOCoreLogger
 
 open class NIOServer: Server
