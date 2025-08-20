@@ -60,7 +60,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         self.router = router
     }
     
-    private func dispatch_request( completion: @escaping MethodEndpointCompletionBlock )
+    private func dispatch_request( _ context: ChannelHandlerContext, completion: @escaping MethodEndpointCompletionBlock )
     {
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
@@ -98,7 +98,16 @@ class ServerHTTPHandler: ChannelInboundHandler
         else if endpoint!.methods[ method ] != nil {
             request.parameters = route_vars
             let endpoint_spec = endpoint!.methods[ method ]!
-            endpoint_spec.run( request, response, completion )
+            if endpoint_spec.executionType == .sync {
+                endpoint_spec.run( request, response, completion )
+            }
+            else {
+                let eventLoop = context.eventLoop
+                let promise = eventLoop.makePromise(of: Void.self)
+                promise.completeWithTask {
+                    await endpoint_spec.run( self.request, self.response, completion )
+                }
+            }
         }
         else {
             completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )
@@ -134,7 +143,7 @@ class ServerHTTPHandler: ChannelInboundHandler
             self.state.requestComplete()
                         
             request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
-            dispatch_request() { result, error, handler in
+            dispatch_request( context ) { result, error, handler in
                 if context.eventLoop.inEventLoop {
                     self.handle_response( result: result, error: error, context: context, handlerContext: handler )
                 } else {
