@@ -1,6 +1,6 @@
 //
 //  Endpoint.swift
-//  
+//
 //
 //  Created by David Trallero on 21/10/21.
 //  Modified by Javier Segura on 12/03/23.
@@ -8,153 +8,7 @@
 
 import Foundation
 import MIOCore
-
-public typealias RouterPathVars = [String:String]
-
-public class RouterPathNode: Equatable
-{
-    var name: String
-    var key: String
-    var is_var: Bool
-    var is_optional: Bool
-    var regex: NSRegularExpression?
-    
-    
-    public init ( _ n : String ) {
-        name = n
-        is_var = n.first == ":"
-        
-        if let from = name.firstIndex( of: "(" ) {
-            key = String( name[..<from] )
-            
-            let pattern = name.dropFirst( from.utf16Offset(in: name ) )
-            do {
-                regex = try NSRegularExpression( pattern: String( pattern ) )
-            } catch {
-                NSLog( "ERROR IN REGEX: \(pattern)" )
-            }
-        } else {
-            regex = nil
-            key = name
-        }
-        
-        if is_var {
-            key = String( key.dropFirst() )
-        }
-
-        is_optional = key.last == "?"
-
-        if is_optional {
-            key = String( key.dropLast() )
-        }
-    }
-    
-    
-    public func match ( _ node: RouterPathNode ) -> Bool {
-        return is_var && node.is_var ? name == node.name
-             : regex != nil ?
-               regex!.firstMatch( in: node.name, options: [], range: NSRange( location: 0, length: node.name.count ) ) != nil
-             : is_var || name == node.name
-    }
-}
-
-
-public func ==( left:RouterPathNode, right:RouterPathNode ) -> Bool {
-    return left.name == right.name
-}
-
-
-public typealias RouterPathDiff = ( common: RouterPath, left: RouterPath, right: RouterPath )
-
-public class RouterPath
-{
-    var parts: [RouterPathNode]
-
-    init ( _ path: String = "" ) {
-        parts = path.components(separatedBy: "/").filter{ $0 != "" }.map{ RouterPathNode( $0 ) }
-    }
-
-    init ( from: [RouterPathNode] ) {
-        parts = from
-    }
-    
-    func is_empty ( ) -> Bool { return parts.count == 0 }
-    public func index_part ( ) -> String { return parts[ 0 ].name }
-    public func starts_with_var ( ) -> Bool { return parts.count > 0 && parts[ 0 ].is_var }
-    public func starts_with_regex ( ) -> Bool { return parts.count > 0 && parts[ 0 ].regex != nil }
-    public func drop_first ( ) -> RouterPath { return RouterPath( from: Array( parts.dropFirst() ) ) }
-    
-    func match ( _ rhs: RouterPath, _ vars: inout RouterPathVars ) -> RouterPathDiff? {
-        var common: [RouterPathNode] = []
-        
-        let optional_parts = parts.filter{ p in p.is_optional }.count
-        
-        if parts.count - optional_parts > rhs.parts.count { return nil }
-        
-        for i in Array(0..<parts.count) {
-            let p = parts[ i ]
-            
-            if i >= rhs.parts.count {
-                if p.is_optional {
-                    common.append( p )
-                    continue
-                } else {
-                    return nil
-                }
-            }
-            
-            if !p.match( rhs.parts[ i ] ) {
-                return nil
-            }
-            
-            if p.is_var {
-                vars[ p.key ] = rhs.parts[ i ].name
-            }
-            
-            common.append( p )
-        }
-        
-        let j = min( parts.count, rhs.parts.count )
-        
-        return ( common: RouterPath( from: common )
-               , left  : RouterPath( from: Array( parts[ common.count ..< parts.count ] ) )
-               , right : RouterPath( from: Array( rhs.parts[  j ..< rhs.parts.count  ] ) ) )
-    }
-    
-
-    func diff ( _ rhs: RouterPath ) -> RouterPathDiff {
-        var common: [RouterPathNode] = []
-        let max_len = min( parts.count, rhs.parts.count )
-        
-        func rest ( _ j: Int ) -> RouterPathDiff {
-            return ( common: RouterPath( from: common )
-                   , left  : RouterPath( from: Array( parts[ j ..< parts.count ] ) )
-                   , right : RouterPath( from: Array( rhs.parts[  j ..< rhs.parts.count  ] ) ) )
-        }
-        
-        for i in Array(0..<max_len) {
-            let left  = parts[ i ]
-            let right = rhs.parts[ i ]
-            
-            if left.name != right.name {
-                return rest( i )
-            }
-            
-            common.append( parts[ i ] )
-        }
-        
-        return rest( max_len )
-    }
-    
-    public func join ( _ extra: RouterPath ) {
-        parts.append(contentsOf: extra.parts )
-    }
-    
-    func debug_path ( ) -> String {
-        return parts.count == 0 ? "/"
-             : parts.map{ $0.name }.joined(separator: "/")
-    }
-}
+import MIOCoreLogger
 
 public enum EndpointMethod: String
 {
@@ -164,11 +18,13 @@ public enum EndpointMethod: String
     case PATCH   = "PATCH"
     case DELETE  = "DELETE"
     case OPTIONS = "OPTIONS"
+    case HEAD    = "HEAD"
 }
 
-public class EndpointTreeLeaf
+// MARK: - EndpointPath
+public class EndpointPath
 {
-    var path: RouterPath
+    public var path: RouterPath
 
     public init ( _ url: String = "" ) {
         path = RouterPath( url )
@@ -179,7 +35,7 @@ public class EndpointTreeLeaf
     }
     
     @discardableResult
-    public func set_path ( _ new_path: RouterPath ) -> EndpointTreeLeaf {
+    public func set_path ( _ new_path: RouterPath ) -> EndpointPath {
         path = new_path
         return self
     }
@@ -188,7 +44,7 @@ public class EndpointTreeLeaf
         return path.match( url, &vars )
     }
     
-    public func diff ( _ node: EndpointTreeLeaf /*, _ vars: inout RouterPathVars */ ) -> RouterPathDiff {
+    public func diff ( _ node: EndpointPath /*, _ vars: inout RouterPathVars */ ) -> RouterPathDiff {
         return diff( node.path /*, &vars */ )
     }
     
@@ -205,334 +61,199 @@ public class EndpointTreeLeaf
     }
 }
 
+// MARK: - MethodEndpoint
 
-public class EndpointTreeNode<T>
+public typealias SyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) throws -> Any?
+public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) async throws -> Any?
+
+public typealias MethodEndpointCompletionBlock = ( Any?, Error?, RouterContext? ) -> Void
+
+protocol MethodEndpointExecutionProtocol {
+    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
+    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async
+}
+
+public struct MethodEndpoint
 {
-    var value: EndpointTreeLeaf?
-    var nodes: [String:EndpointTreeNode] = [:]
-    var var_nodes: [EndpointTreeNode] = []
-    var null_node: EndpointTreeNode? = nil
-    
-    public init ( _ leaf: EndpointTreeLeaf? = nil ) {
-        value = leaf
-    }
-    
-    func clone ( ) -> EndpointTreeNode {
-        let cloned = EndpointTreeNode( )
-        
-        cloned.value     = value
-        cloned.nodes     = nodes
-        cloned.var_nodes = var_nodes
-        cloned.null_node = null_node
-        
-        return cloned
-    }
-    
-    func clean ( ) {
-        value     = nil
-        nodes     = [:]
-        var_nodes = []
-        null_node = nil
-    }
-
-    func insert ( _ ep: EndpointTreeLeaf ) {
-        // CASO MINIMAL
-        // HAS (null)
-        // INS: /a/b/c
-        // OUT: /a/b/c
-        if nodes.count == 0 && value == nil {
-            value = ep
-        } else {
-            insert( EndpointTreeNode( ep ) )
-        }
-    }
-    
-    func insert ( _ node: EndpointTreeNode ) {
-        if value == nil || node.is_null_node() {
-          // CASE 1:
-          // HAS:
-          // (null)
-          //   - entity
-          //   - book
-          // INS: /whatever
-          // OUT:
-          // (null)
-          //   - entity
-          //   - book
-          //   - whatever
-          //
-          // CASE 1.1: We do insert the null_node
-          insert_subnode( node )
-        } else {
-            // var unused_vars: RouterPathVars = [:]
-            let root_diff = value!.diff( node.value! /*, &unused_vars */ )
-            
-            // CASE 1:
-            // HAS: /entity
-            // INS: /book
-            // OUT:
-            // (null)
-            //   - entity
-            //   - book
-            if root_diff.common.is_empty() {
-                let cloned = self.clone( )
-                self.clean( )
-                
-                insert_subnode( cloned )
-                insert_subnode( node )
-            } else {
-                // CASE 2: (left is NOT empty)
-                // HAS /entity/A     OR /entity/A/A1
-                //             - A1
-                // INS /entity/B
-                // OUT:
-                //   entity
-                //     - A        OR - A/A1
-                //       - A1
-                //     - B
-                //
-                // CASE 2.1: (left is empty)
-                // HAS /entity/A
-                // INS /entity/A/A1
-                // OUT:
-                //   entity/A
-                //       - A1
-                node.value!.set_path( root_diff.right )
-
-                if !root_diff.left.is_empty() {
-                    let cloned = self.clone( )
-                    cloned.value!.set_path( root_diff.left )
-
-                    self.clean( )
-                    
-                    value = EndpointTreeLeaf( root_diff.common )
-                    
-                    insert_subnode( cloned )
-                }
-                
-                insert_subnode( node )
-            }
-        }
-    }
-
-    
-    // Leaf deriva de node? Y es el node el que tiene el Path!??
-    func insert_subnode ( _ n: EndpointTreeNode ) {
-        if n.is_null_node() {
-            // CASE:
-            // HAS /hook/version
-            // INS /hook
-            // OUT:
-            //  (null)
-            //     - version
-            //     - /
-            if value != nil {
-                let cloned = self.clone( )
-                self.clean( )
-                insert_subnode( cloned )
-            }
-            
-            // overwrite? should we launch exception?
-            null_node = n
-        } else if n.starts_with_var() {
-            var_nodes.append( n )
-        } else {
-            let key = n.index_part()
-            
-            n.value!.set_path( n.value!.path.drop_first() )
-            
-            if nodes[ key ] == nil {
-                nodes[ key ] = n
-            } else {
-                nodes[ key ]!.insert( n )
-            }
-        }
-    }
-
-    public func index_part ( ) -> String { return value!.index_part( ) }
-    public func starts_with_var ( ) -> Bool { return value?.starts_with_var() ?? false }
-    public func starts_with_regex ( ) -> Bool { return value?.starts_with_regex() ?? false }
-    public func is_null_node ( ) -> Bool { return value == nil || value!.path.is_empty() }
-    
-    func find (  _ route: RouterPath ) -> EndpointTreeNode? {
-        if value == nil {
-            return find_subnode( route )
-        } else {
-            if route.is_empty() && value!.path.is_empty() {
-                return self
-            }
-            
-            let diff = value!.diff( route )
-
-            if diff.common.is_empty() {
-                return nil
-            } else {
-                if diff.right.is_empty() && diff.left.is_empty() {
-                    return self
-                }
-
-                return find_subnode( diff.right )
-            }
-        }
-    }
-    
-    
-    func find_subnode ( _ route: RouterPath ) -> EndpointTreeNode? {
-        if route.is_empty() {
-            return null_node?.find( route )
-        } else if route.starts_with_var() {
-            for vnode in var_nodes {
-                if let leaf = vnode.find( route ) {
-                    return leaf
-                }
-            }
-        } else {
-            let key = route.index_part()
-            
-            if nodes.keys.contains( key ) {
-                return nodes[ key ]!.find( route.drop_first( ) )
-            }
-        }
-        
-        return nil
-    }
-
-    
-    func match ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint<T>?
+    // Wrapper for sync callbacks
+    struct SyncEndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
     {
-        if value == nil {
-            return match_subnode( method, route, &vars )
-        } else {
-            if route.is_empty() && value!.path.is_empty() {
-                return self.value as? Endpoint
-            }
-            
-            let diff = value!.match( method, route, &vars )
-
-            if diff == nil || diff!.common.is_empty() {
-                return nil
-            } else {
-                if diff!.right.is_empty() && diff!.left.is_empty() {
-                    return self.value as? Endpoint
-                }
-
-                return match_subnode( method, diff!.right, &vars )
-            }
-        }
-    }
-    
-    
-    func match_subnode ( _ method: EndpointMethod, _ route: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint<T>? {
-        if route.is_empty() {
-            return null_node?.match( method, route, &vars )
+        let cb: SyncEndpointRequestDispatcher<T>
+        
+        init ( _ cb: @escaping SyncEndpointRequestDispatcher<T> ) {
+            self.cb = cb
         }
         
-        let key = route.index_part()
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async {
+            completion( nil, MIOCoreError.general( "Not implemented yet" ), nil )
+        }
         
-        if nodes.keys.contains( key ) {
-            return nodes[ key ]!.match( method, route.drop_first( ), &vars )
-        } else {
-            for vnode in var_nodes {
-                var leaf_vars: RouterPathVars = [:]
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
+        {
+            do {
+                let ctx = try T.init( request, response )
+                try ctx.willExecute()
+                let result = try cb( ctx )
+                try ctx.didExecute()
                 
-                if let leaf = vnode.match( method, route, &leaf_vars ) {
-                    vars.merge( leaf_vars ){ (old,new) in new }
-                    return leaf
-                }
+                completion( result, nil, ctx )
+                Log.debug( "Syncrhonous endpoint executed successfully." )
+            }
+            catch {
+                Log.error( "\(error)" )
+                completion( nil, error, nil )
             }
         }
+    }
         
-        // CASE:
-        // (null)
-        //   schema/:scheme([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})
-        //     sync-annotations/:sync_id?
-        //       -> GET
-        //     all-sync-annotations//
-        //       -> GET
-        return null_node?.match( method, route, &vars )
+    // Wrapper for async callbacks
+    struct AsyncEndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
+    {
+        let cb: AsyncEndpointRequestDispatcher<T>
+        
+        init ( _ cb: @escaping AsyncEndpointRequestDispatcher<T> ) {
+            self.cb = cb
+        }
+        
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
+            completion( nil, MIOCoreError.general( "Not implemented yet" ), nil )
+        }
+        
+        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async
+        {
+            do {
+                let ctx = try T.init( request, response )
+                try await ctx.willExecute()
+                let result = try await cb( ctx )
+                try await ctx.didExecute()
+                
+                completion( result, nil, ctx )
+                Log.debug( "Asyncrhonous endpoint executed successfully." )
+            }
+            catch {
+                Log.error( "\(error)" )
+                completion( nil, error, nil )
+            }
+        }
     }
     
+    public enum EndpointExecutionType {
+        case sync
+        case async
+    }
     
-    public func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
-        func pad ( ) -> String {
-            return "".padding(toLength: spaces, withPad: " ", startingAt: 0)
-        }
-        
-        if value != nil {
-            value!.debug_info( spaces, prefix )
-        } else {
-            print( pad( ) + (prefix == "" ? "(null)" : prefix) )
-        }
-        
-        for (key,n) in nodes {
-            n.debug_info( spaces + 2, key + "/" )
-        }
-        
-        for n in var_nodes {
-            n.debug_info( spaces + 2 )
-        }
-        
-        if null_node != nil {
-            null_node!.debug_info( spaces + 2 )
-        }
+    var wrapper: any MethodEndpointExecutionProtocol
+    var extra_url: RouterPath?
+    var _execution_type: EndpointExecutionType
+    public var executionType : EndpointExecutionType { return _execution_type }
+
+    // Init for sync callbacks
+    init <T:RouterContext>(cb: @escaping SyncEndpointRequestDispatcher<T>, extraUrl: RouterPath? = nil ) {
+        wrapper = SyncEndpointWrapper( cb )
+        extra_url = extraUrl
+        _execution_type = .sync
+    }
+    
+    // Init for async callbacks
+    init <T:RouterContext>(async_cb: @escaping AsyncEndpointRequestDispatcher<T>, extraUrl: RouterPath? = nil ) {
+        wrapper = AsyncEndpointWrapper( async_cb )
+        extra_url = extraUrl
+        _execution_type = .async
+    }
+
+    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
+        wrapper.run( request, response, completion )
+    }
+    
+    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )  async {
+        await wrapper.run( request, response, completion )
     }
 }
 
-
-public typealias MethodDispatcher<RouterContextProtocol> = ( _ context: RouterContextProtocol ) throws -> Optional<Any>
-
-public class Endpoint<T> : EndpointTreeLeaf
+// MARK: - Endpoint
+public class Endpoint// : EndpointPath
 {
-    public struct EndpointMethodDispatcher<T>
-    {
-        var cb: MethodDispatcher<T>
-        var extra_url: RouterPath?
+//   public typealias RouterClass = RouterContextProtocol
         
-        init(cb: @escaping MethodDispatcher<T>, extra_url: RouterPath? = nil ) {
-            self.cb = cb
-            self.extra_url = extra_url
-        }
-        
-        func contextType ( ) -> T.Type {
-           return T.self
-        }
+    public var methods: [ EndpointMethod : MethodEndpoint ] = [:]
+    
+//    public var methods: [ EndpointMethod: (cb: EndpointRequestDispatcher<T>, extra_url: RouterPath?, ct: RouterContextProtocol) ] = [:]
+
+    // Sync methods    
+    @discardableResult
+    public func get<T>( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .GET, cb, url )
+    }
+
+    @discardableResult
+    public func post<T>( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .POST, cb, url )
     }
     
-//    public var methods: [ EndpointMethod: (cb: EndpointRequestDispatcher<Any>, extra_url: RouterPath?, contextType: Any) ] = [:]
-    public var methods: [ EndpointMethod: EndpointMethodDispatcher<T> ] = [:]
+    @discardableResult
+    public func put<T> ( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .PUT, cb, url )
+    }
     
     @discardableResult
-    public func get ( _ cb: @escaping MethodDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .GET   , cb, url ) }
+    public func patch<T> ( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .PATCH , cb, url )
+    }
 
     @discardableResult
-    public func post ( _ cb: @escaping MethodDispatcher<T>, _ url: String? = nil ) -> Endpoint { return add_method( .POST  , cb, url ) }
+    public func delete<T> ( _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addSyncMethod( .DELETE, cb, url )
+    }
     
-    @discardableResult
-    public func put ( _ cb: @escaping MethodDispatcher<T>, urlString: String? = nil ) -> Endpoint { return add_method( .PUT   , cb, urlString ) }
-    
-//    @discardableResult
-//    public func patch  ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .PATCH , cb, url ) }
-//
-//    @discardableResult
-//    public func delete ( _ cb: @escaping EndpointRequestDispatcher, _ url: String? = nil ) -> Endpoint { return add_method( .DELETE, cb, url ) }
-    
-    func add_method ( _ method: EndpointMethod, _ cb: @escaping MethodDispatcher<T>, _ url: String? ) -> Endpoint {
-        methods[ method ] = EndpointMethodDispatcher(cb: cb, extra_url: url != nil ? RouterPath( url! ): nil )
+    func addSyncMethod<T> ( _ method: EndpointMethod, _ cb: @escaping SyncEndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
+        methods[ method ] = MethodEndpoint(cb: cb, extraUrl: url != nil ? RouterPath( url! ): nil )
         return self
     }
 
+    // Async methods
+    @discardableResult
+    public func get<T>( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .GET, cb, url )
+    }
+
+    @discardableResult
+    public func post<T>( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .POST, cb, url )
+    }
+    
+    @discardableResult
+    public func put<T> ( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .PUT, cb, url )
+    }
+    
+    @discardableResult
+    public func patch<T> ( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .PATCH , cb, url )
+    }
+
+    @discardableResult
+    public func delete<T> ( _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? = nil ) -> Endpoint {
+        return addAsyncMethod( .DELETE, cb, url )
+    }
+
+    func addAsyncMethod<T> ( _ method: EndpointMethod, _ cb: @escaping AsyncEndpointRequestDispatcher<T>, _ url: String? ) -> Endpoint {
+        methods[ method ] = MethodEndpoint(async_cb: cb, extraUrl: url != nil ? RouterPath( url! ): nil )
+        return self
+    }
+/*
     override public func match ( _ method: EndpointMethod, _ url: RouterPath, _ vars: inout RouterPathVars ) -> RouterPathDiff? {
         if methods[ method ] == nil { return nil }
 
         var super_vars: RouterPathVars = [:]
 
         if var ret = super.match( method, url, &super_vars ) {
+            let entry = methods[ method ]
             var extra_vars: RouterPathVars = [:]
             let endpoint_method = methods[ method ]!
 
-            if endpoint_method.extra_url != nil {
+            if entry?.extra_url != nil {
                 if !ret.right.is_empty() {
-                    if let extra_ret = endpoint_method.extra_url!.match( ret.right, &extra_vars ) {
+                    if let extra_ret = entry?.extra_url!.match( ret.right, &extra_vars ) {
                         ret.common.join( extra_ret.common )
                         ret.right = extra_ret.right
                     } else {
@@ -575,11 +296,13 @@ public class Endpoint<T> : EndpointTreeLeaf
         super.debug_info( spaces, prefix )
         
         for (key, value ) in methods {
-            let str = "\(key.rawValue) \(value.extra_url?.debug_path() ?? "")"
-            print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str)
+            // let wrapper = value.wrapper as! MethodEndpoint.EndpointWrapper<RouterContext>
+            // let address = unsafeBitCast(wrapper.cb, to: Int.self)
+            let str = "\(key.rawValue) \(value.extra_url?.debug_path() ?? "<no extra url>")"
+            print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str) // + "\(String(format: "%p", address))")
         }
     }
+ 
+ */
 }
 
-
-public class EndpointTree<T> : EndpointTreeNode<T> { }
