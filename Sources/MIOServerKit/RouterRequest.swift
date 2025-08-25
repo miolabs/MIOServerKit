@@ -30,8 +30,8 @@ open class RouterRequest
     public var body:Data? = nil
                 
     public init() {
-        _http_request_head = HTTPRequestHead(version: .http1_1, method: .GET, uri: "")
-        _url = URL( string: "" )!
+        _http_request_head = HTTPRequestHead(version: .http1_1, method: .GET, uri: "http://localhost")
+        _url = URL( string: "http://localhost" )!
         _query_parameters = [:]
     }
     

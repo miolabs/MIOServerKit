@@ -26,7 +26,7 @@ public protocol RouterContextProtocol : AnyObject
     func bodyParam<T> (_ name: String, optional: Bool ) throws -> T?
     
     func bodyAsData() -> Data?
-    func bodyAsJSON() -> Any?
+    func bodyAsJSON<T>() throws -> T?
         
     // Sync methods
     func willExecute() throws
@@ -59,13 +59,13 @@ extension RouterContextProtocol
     }
     
     public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
-        let json = bodyAsJSON()
+        let json:[ String:Any ]? = try bodyAsJSON()
         if json == nil {
             if optional { return nil }
             throw ServerError.missingJSONBody( )
         }
 
-        if let dict = json as? [ String:Any ] {
+        if let dict = json {
 
             if let value = dict[ name ] as? T {
                 return value
@@ -145,25 +145,25 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         super.init( values )
     }
     
-    public func urlParam<T> ( _ name: String ) throws -> T {
-        return try MIOCoreParam( request.parameters, name )
-    }
+//    public func urlParam<T> ( _ name: String ) throws -> T {
+//        return try MIOCoreParam( request.parameters, name )
+//    }
     
-    public func queryParam ( _ name: String ) -> String? {
-        return request.queryParameters[ name ]
-    }
+//    public func queryParam ( _ name: String ) -> String? {
+//        return request.queryParameters[ name ]
+//    }
     
-    public func bodyAsData() -> Data? {
-        return request.body
-    }
+//    public func bodyAsData() -> Data? {
+//        return request.body
+//    }
 
-    public func bodyAsJSON() -> Any? {
-        if request.body == nil { return nil }
-        return try? JSONSerialization.jsonObject( with: request.body! )
-    }
+//    public func bodyAsJSON() throws -> Any? {
+//        if request.body == nil { return nil }
+//        return try JSONSerialization.jsonObject( with: request.body! )
+//    }
         
-    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
-        guard let json = bodyAsJSON() else {
+/*    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
+        guard let json = try bodyAsJSON() else {
             throw ServerError.missingJSONBody( )
         }
 
@@ -173,7 +173,7 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
 
         if optional { return nil }
         throw ServerError.fieldNotFound( name )
-    }
+    } */
     
     // Default implementations for sync methods
     open func willExecute() throws { }

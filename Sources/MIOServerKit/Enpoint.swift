@@ -63,10 +63,10 @@ public class EndpointPath
 
 // MARK: - MethodEndpoint
 
-public typealias SyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) throws -> Any?
-public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) async throws -> Any?
+public typealias SyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) throws -> (any Sendable)?
+public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) async throws -> (any Sendable)?
 
-public typealias MethodEndpointCompletionBlock = ( Any?, Error?, RouterContext? ) -> Void
+public typealias MethodEndpointCompletionBlock = ( (any Sendable)?, Error?, RouterContext? ) -> Void
 
 protocol MethodEndpointExecutionProtocol {
     func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
