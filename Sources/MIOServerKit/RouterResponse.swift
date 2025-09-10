@@ -31,44 +31,5 @@ open class RouterResponse
     public func status ( _ status:HTTPResponseStatus ) -> RouterResponse {
         self.status = status
         return self
-    }
-    
-//    @discardableResult
-//    public func send ( data: Data ) -> RouterResponse {
-//        body = data
-//        return self
-//    }
-//
-//    @discardableResult
-//    public func send ( json:[Any] ) throws -> RouterResponse {
-//        headers["Content-Type"] = "application/json"
-//        body = try MIOCoreJsonValue( withJSONObject: json )
-//        return self
-//    }
-//
-//    @discardableResult
-//    public func send ( json:[String:Any] ) throws -> RouterResponse {
-//        headers["Content-Type"] = "application/json"
-//        body = try MIOCoreJsonValue( withJSONObject: json )
-//        return self
-//    }
-//
-//    @discardableResult
-//    public func send (_ text:String ) -> RouterResponse {
-//        body = text.data( using: .utf8 )
-//        return self
-//    }
-
-//    public func redirect ( _ path: String ) throws {
-//        try response!.redirect( path )
-//    }
-    
-//    public func end() throws {
-//        try response!.end()
-//    }
-    
-//    public func send(json: Encodable) -> RouterResponse {
-//        response.send(json: json)
-//        return self
-//    }
+    }    
 }

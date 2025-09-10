@@ -86,50 +86,6 @@ extension RouterContextProtocol
     public func willExecute() async throws { }
     public func didExecute() async throws { }
     
-//    public func sendOKResponse ( _ json : Any? = nil ) throws {
-//        response.status(.ok)
-//
-//        if json == nil {
-//
-//        } else if json is Data {
-//            response.send( data: json as! Data )
-//        } else if let ret = json as? ResponseContext {
-//            response.send( json: ret.asJson( ) )
-//        } else if let ret = json as? String {
-//            response.send( ret )
-//        } else {
-//            let response_json = json is [Any] || json is [String: Any] ? [ "status" : "OK", "data" : json! ]
-//                              :                                          [ "status" : "OK" ]
-//            #if SAVE_RECORD
-//            if record_request {
-//                g_request_recorder.append( RequestRecorded( self, response_json ) )
-//            }
-//            #endif
-//
-//            response.send(json: MIOCoreSerializableJSON( response_json ) as! [String:Any] )
-//        }
-//
-//        try response.end( )
-//    }
-//
-    
-//    public func sendErrorResponse ( _ error : Error, httpStatus : HTTPResponseStatus = .badRequest) throws {
-//
-//        response.status( httpStatus )
-//
-//        let response_json: [String:Any] = ["status" : "Error", "error" : error.localizedDescription, "errorCode": error is MIOErrorCode ? (error as! MIOErrorCode).code : 0 ]
-//
-//        #if SAVE_RECORD
-//        if record_request {
-//            g_request_recorder.append( RequestRecorded( self, response_json ) )
-//        }
-//        #endif
-//
-//        response.send( json: response_json )
-//
-//        try response.end( )
-//    }
-
 }
 
 
@@ -155,20 +111,33 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         
     open func extraResponseHeaders ( ) -> [String:String] { return [:] }
     open func responseBody ( _ value : Any? = nil ) throws -> Data? {
+        var content_type:String? = nil
+        var body:Data?           = nil
+        
         switch value {
-        case let d as Data  :
-            self.response.headers.replaceOrAdd(name: .contentType, value: "application/octet-stream" )
-            return d
+        case let d as Data:
+            content_type = "application/octet-stream"
+            body = d
         case let s as String:
-            self.response.headers.replaceOrAdd(name: .contentType, value: "text/plain" )
-            return s.data(using: .utf8)
+            content_type = "text/plain"
+            body = s.data(using: .utf8)
         case let arr as [Any]:
-            self.response.headers.replaceOrAdd(name: .contentType, value: "application/json" )
-            return try MIOCoreJsonValue(withJSONObject: arr)
         case let dic as [String:Any]:
-            self.response.headers.replaceOrAdd(name: .contentType, value: "application/json" )
+            content_type = "application/json"
+            body = try MIOCoreJsonValue(withJSONObject: dic)
+
+            if self.response.headers[.contentType].count == 0 {
+                self.response.headers.replaceOrAdd(name: .contentType, value: "application/json" )
+            }
             return try MIOCoreJsonValue(withJSONObject: dic)
-        default: return nil
+        
+        default: break
         }
+        
+        if self.response.headers[.contentType].count == 0, let ct = content_type {
+            self.response.headers.replaceOrAdd(name: .contentType, value: ct )
+        }
+
+        return body
     }
 }
