@@ -145,36 +145,6 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         super.init( values )
     }
     
-//    public func urlParam<T> ( _ name: String ) throws -> T {
-//        return try MIOCoreParam( request.parameters, name )
-//    }
-    
-//    public func queryParam ( _ name: String ) -> String? {
-//        return request.queryParameters[ name ]
-//    }
-    
-//    public func bodyAsData() -> Data? {
-//        return request.body
-//    }
-
-//    public func bodyAsJSON() throws -> Any? {
-//        if request.body == nil { return nil }
-//        return try JSONSerialization.jsonObject( with: request.body! )
-//    }
-        
-/*    public func bodyParam<T> (_ name: String, optional: Bool = false ) throws -> T? {
-        guard let json = try bodyAsJSON() else {
-            throw ServerError.missingJSONBody( )
-        }
-
-        if let value = ( json as? [ String:Any ] )?[ name ] as? T {
-            return value
-        }
-
-        if optional { return nil }
-        throw ServerError.fieldNotFound( name )
-    } */
-    
     // Default implementations for sync methods
     open func willExecute() throws { }
     open func didExecute() throws { }
@@ -186,13 +156,17 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     open func extraResponseHeaders ( ) -> [String:String] { return [:] }
     open func responseBody ( _ value : Any? = nil ) throws -> Data? {
         switch value {
-        case let d as Data  : return d
-        case let s as String: return s.data(using: .utf8)
+        case let d as Data  :
+            self.response.headers.replaceOrAdd(name: .contentType, value: "application/octet-stream" )
+            return d
+        case let s as String:
+            self.response.headers.replaceOrAdd(name: .contentType, value: "text/plain" )
+            return s.data(using: .utf8)
         case let arr as [Any]:
-            self.response.headers.add(name: .contentType, value: "application/json" )
+            self.response.headers.replaceOrAdd(name: .contentType, value: "application/json" )
             return try MIOCoreJsonValue(withJSONObject: arr)
         case let dic as [String:Any]:
-            self.response.headers.add(name: .contentType, value: "application/json" )
+            self.response.headers.replaceOrAdd(name: .contentType, value: "application/json" )
             return try MIOCoreJsonValue(withJSONObject: dic)
         default: return nil
         }
