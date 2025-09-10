@@ -122,15 +122,11 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
             content_type = "text/plain"
             body = s.data(using: .utf8)
         case let arr as [Any]:
+            content_type = "application/json"
+            body = try MIOCoreJsonValue(withJSONObject: arr)
         case let dic as [String:Any]:
             content_type = "application/json"
             body = try MIOCoreJsonValue(withJSONObject: dic)
-
-            if self.response.headers[.contentType].count == 0 {
-                self.response.headers.replaceOrAdd(name: .contentType, value: "application/json" )
-            }
-            return try MIOCoreJsonValue(withJSONObject: dic)
-        
         default: break
         }
         
