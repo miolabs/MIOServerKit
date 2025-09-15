@@ -54,9 +54,11 @@ class ServerHTTPHandler: ChannelInboundHandler
     var response:RouterResponse!
         
     private let router: Router
-    
-    public init( router:Router ) {
+    private let threadPool: NIOThreadPool
+
+    public init(router: Router, threadPool: NIOThreadPool) {
         self.router = router
+        self.threadPool = threadPool
     }
     
     private func dispatch_request( _ context: ChannelHandlerContext, completion: @escaping MethodEndpointCompletionBlock )
@@ -68,7 +70,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         let endpoint = router.root.match( RouterPath( path ), &route_vars )
         
         if endpoint == nil {
-            completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )
+            completion( nil, ServerError.endpointNotFound( path, method.rawValue ) )
             return
         }
 
@@ -88,28 +90,44 @@ class ServerHTTPHandler: ChannelInboundHandler
         if method == .OPTIONS {
             response.status(.noContent)
             response.headers.add(name: .allow, value: Array( endpoint!.methods.keys ).map(\.rawValue).joined(separator: ", ") + ", HEAD" )
-            completion(nil, nil, nil)
+            completion(nil, nil)
         }
         else if method == .HEAD {
             response.status(.ok)
-            completion(nil, nil, nil)
+            completion(nil, nil)
         }
         else if endpoint!.methods[ method ] != nil {
             request.parameters = route_vars
+            let loop = context.eventLoop
             let endpoint_spec = endpoint!.methods[ method ]!
-            if endpoint_spec.executionType == .sync {
-                endpoint_spec.run( request, response, completion )
-            }
-            else {
-                let eventLoop = context.eventLoop
-                let promise = eventLoop.makePromise(of: Void.self)
-                promise.completeWithTask {
-                    await endpoint_spec.run( self.request, self.response, completion )
+            
+            let req = self.request!
+            let res = self.response!
+            
+            switch endpoint_spec.executionType {
+            case .sync:
+                // Offload sync endpoints to the thread pool.
+                threadPool.submit { _ in
+                    endpoint_spec.run(req, res) { result, error in
+                        // Always hop back to the channel's event loop before touching NIO.
+                        loop.execute {
+                            completion(result, error)
+                        }
+                    }
+                }
+            case .async:
+                // Run with Swift Concurrency; hop back to the event loop in the callback.
+                Task.detached {
+                    await endpoint_spec.run(req, res) { result, error in
+                        loop.execute {
+                            completion(result, error)
+                        }
+                    }
                 }
             }
         }
         else {
-            completion( nil, ServerError.endpointNotFound( path, method.rawValue ), nil )
+            completion( nil, ServerError.endpointNotFound( path, method.rawValue ) )
         }
     }
                    
@@ -142,19 +160,19 @@ class ServerHTTPHandler: ChannelInboundHandler
             self.state.requestComplete()
                         
             request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
-            dispatch_request( context ) { result, error, handler in
+            dispatch_request( context ) { result, error in
                 if context.eventLoop.inEventLoop {
-                    self.handle_response( result: result, error: error, context: context, handlerContext: handler )
+                    self.handle_response( result: result, error: error, context: context )
                 } else {
                     context.eventLoop.execute {
-                        self.handle_response( result: result, error: error, context: context, handlerContext: handler )
+                        self.handle_response( result: result, error: error, context: context )
                     }
                 }
             }
         }
     }
     
-    func handle_response( result: Any?, error:Error?, context: ChannelHandlerContext, handlerContext: RouterContext? )
+    func handle_response( result: Any?, error:Error?, context: ChannelHandlerContext )
     {
         self.buffer.clear()
         
@@ -163,8 +181,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
         else {
             do {
-                let value = try handlerContext?.responseBody( result ) ?? result
-                switch value {
+                switch result {
                 case let d as Data  : self.buffer.writeData(d)
                 case let s as String: self.buffer.writeString(s)
                 case let arr as [Any]:
@@ -183,7 +200,7 @@ class ServerHTTPHandler: ChannelInboundHandler
             }
         }
         
-        self.write_response( context: context, handlerContext: handlerContext )
+        self.write_response( context: context )
         self.complete_response(context, trailers: nil, promise: nil)
         
         // Clean up
@@ -204,15 +221,11 @@ class ServerHTTPHandler: ChannelInboundHandler
     }
 
     // Helper method to write the response on the event loop thread
-    private func write_response( context: ChannelHandlerContext, handlerContext: RouterContext? )
+    private func write_response( context: ChannelHandlerContext )
     {
-        var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response!.status)
-        
-        for (k,v) in handlerContext?.extraResponseHeaders( ) ?? [:] {
-            responseHead.headers.add(name: k, value: v)
-        }
-                
-        for (k, v) in response!.headers {
+        var responseHead = httpResponseHead(request: infoSavedRequestHead!, status: response.status)
+                        
+        for (k, v) in response.headers {
             responseHead.headers.add(name: k, value: v)
         }
         

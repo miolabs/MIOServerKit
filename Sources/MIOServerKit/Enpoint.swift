@@ -66,7 +66,7 @@ public class EndpointPath
 public typealias SyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) throws -> (any Sendable)?
 public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) async throws -> (any Sendable)?
 
-public typealias MethodEndpointCompletionBlock = ( (any Sendable)?, Error?, RouterContext? ) -> Void
+public typealias MethodEndpointCompletionBlock = ( (any Sendable)?, Error? ) -> Void
 
 protocol MethodEndpointExecutionProtocol {
     func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
@@ -85,7 +85,7 @@ public struct MethodEndpoint
         }
         
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async {
-            completion( nil, MIOCoreError.general( "Not implemented yet" ), nil )
+            completion( nil, MIOCoreError.general( "Async endpoints are not supported in synchronous mode" ) )
         }
         
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
@@ -93,15 +93,22 @@ public struct MethodEndpoint
             do {
                 let ctx = try T.init( request, response )
                 try ctx.willExecute()
-                let result = try cb( ctx )
+                var result: Any? = try cb( ctx )
                 try ctx.didExecute()
                 
-                completion( result, nil, ctx )
+                // Add Custome headers if available
+                for (k,v) in ctx.responseHeaders() {
+                    response.headers.replaceOrAdd( name: k, value: v )
+                }
+                
+                result = try ctx.responseBodyData( result )
+                
+                completion( result, nil )
                 Log.debug( "Syncrhonous endpoint executed successfully." )
             }
             catch {
                 Log.error( "\(error)" )
-                completion( nil, error, nil )
+                completion( nil, error )
             }
         }
     }
@@ -116,7 +123,7 @@ public struct MethodEndpoint
         }
         
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
-            completion( nil, MIOCoreError.general( "Not implemented yet" ), nil )
+            completion( nil, MIOCoreError.general( "Sync endpoints are not supported in asynchronous mode" ) )
         }
         
         func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async
@@ -124,15 +131,22 @@ public struct MethodEndpoint
             do {
                 let ctx = try T.init( request, response )
                 try await ctx.willExecute()
-                let result = try await cb( ctx )
+                var result:Any? = try await cb( ctx )
                 try await ctx.didExecute()
                 
-                completion( result, nil, ctx )
+                // Add Custome headers if available
+                for (k,v) in ctx.responseHeaders() {
+                    response.headers.replaceOrAdd( name: k, value: v )
+                }
+
+                result = try ctx.responseBodyData( result )
+                
+                completion( result, nil )
                 Log.debug( "Asyncrhonous endpoint executed successfully." )
             }
             catch {
                 Log.error( "\(error)" )
-                completion( nil, error, nil )
+                completion( nil, error )
             }
         }
     }

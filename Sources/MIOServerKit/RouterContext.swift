@@ -109,8 +109,8 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
     open func willExecute() async throws { }
     open func didExecute() async throws { }
         
-    open func extraResponseHeaders ( ) -> [String:String] { return [:] }
-    open func responseBody ( _ value : Any? = nil ) throws -> Data? {
+    open func responseHeaders ( ) -> [String:String] { return [:] }
+    open func responseBodyData ( _ value : Any? = nil ) throws -> Data? {
         var content_type:String? = nil
         var body:Data?           = nil
         
@@ -136,4 +136,19 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
 
         return body
     }
+    
+    public override func sendableValues() -> [String:(any Sendable)] {
+        var values:[String:(any Sendable)] = super.sendableValues()
+                
+        if request.parameters.isEmpty == false {
+            values.merge(request.parameters) { (_, new) in new }
+        }
+        
+        if request.queryParameters.isEmpty == false {
+            values.merge(request.parameters) { (_, new) in new }
+        }
+        
+        return values
+    }
+
 }
