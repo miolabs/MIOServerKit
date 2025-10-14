@@ -66,7 +66,10 @@ class ServerHTTPHandler: ChannelInboundHandler
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
         let method = EndpointMethod( rawValue: request!.method.rawValue )!
-                
+
+        Log.debug( "Endpoint: \(method.rawValue) \(path)" )
+        Log.trace( "Headers: \(request.headers)" )
+        
         let endpoint = router.root.match( RouterPath( path ), &route_vars )
         
         if endpoint == nil {
@@ -75,7 +78,6 @@ class ServerHTTPHandler: ChannelInboundHandler
         }
 
         // TODO: Make a cors plugin so this can be setup externally
-//        response.headers.add(name: .accessControlAllowCredentials, value: "true" )
         response.headers.add(name: .accessControlAllowOrigin, value: "*")
         response.headers.add(name: .accessControlAllowMethods, value: "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD" )
         response.headers.add(name: .accessControlMaxAge, value: "5" )
@@ -83,9 +85,6 @@ class ServerHTTPHandler: ChannelInboundHandler
         
         let values = request.headers[ .accessControlRequestHeaders ].isEmpty ? ["Context-Type"] : request.headers[ .accessControlRequestHeaders ]
         response.headers.add(name: .accessControlAllowHeaders, value: values.joined(separator: ",") )
-
-        Log.debug( "Endpoint: \(method.rawValue) \(path)" )
-        Log.trace( "Headers: \(request.headers)" )
         
         if method == .OPTIONS {
             response.status(.noContent)
@@ -216,7 +215,8 @@ class ServerHTTPHandler: ChannelInboundHandler
         if let err = error as? ServerErrorCodeProtocol {
             response.status = err.errorCode
         }
-                
+
+        Log.debug( "\(error)" )
         self.buffer.writeString(error.localizedDescription)
     }
 
