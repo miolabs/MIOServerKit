@@ -61,6 +61,18 @@ class ServerHTTPHandler: ChannelInboundHandler
         self.threadPool = threadPool
     }
     
+    deinit {
+        Log.debug("ServerHTTPHandler deinit")
+    }
+    
+    func handlerRemoved(context: ChannelHandlerContext) {
+        Log.debug("handlerRemoved")
+    }
+    
+    func channelInactive(context: ChannelHandlerContext) {
+        Log.debug("channelInactive"); context.fireChannelInactive()
+    }
+    
     private func dispatch_request( _ context: ChannelHandlerContext, completion: @escaping MethodEndpointCompletionBlock )
     {
         let path = request.url.relativePath
@@ -159,11 +171,13 @@ class ServerHTTPHandler: ChannelInboundHandler
             self.state.requestComplete()
                         
             request.body = infoSavedBodyBuffer != nil ? Data(buffer: infoSavedBodyBuffer! ) : nil
-            dispatch_request( context ) { result, error in
+            dispatch_request( context ) { [weak self] result, error in
+                guard let self = self else { return }
                 if context.eventLoop.inEventLoop {
                     self.handle_response( result: result, error: error, context: context )
                 } else {
-                    context.eventLoop.execute {
+                    context.eventLoop.execute { [weak self] in
+                        guard let self = self else { return }
                         self.handle_response( result: result, error: error, context: context )
                     }
                 }
@@ -203,8 +217,12 @@ class ServerHTTPHandler: ChannelInboundHandler
         self.complete_response(context, trailers: nil, promise: nil)
         
         // Clean up
-//        self.infoSavedBodyBytes = 0
-//        self.infoSavedBodyBuffer = nil
+        self.infoSavedRequestHead = nil
+        self.infoSavedBodyBuffer = nil
+        self.infoSavedBodyBytes = 0
+        self.request = nil
+        self.response = nil
+        self.buffer.clear()
     }
     
     // Method to handle errors
@@ -251,8 +269,6 @@ class ServerHTTPHandler: ChannelInboundHandler
 
         context.writeAndFlush(self.wrapOutboundOut(.end(trailers)), promise: promise)
     }
-
-
 
     func channelReadComplete(context: ChannelHandlerContext) {
         context.flush()
