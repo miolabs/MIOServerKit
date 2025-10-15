@@ -215,6 +215,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         
         self.write_response( context: context )
         self.complete_response(context, trailers: nil, promise: nil)
+        if self.keepAlive == false { context.close(promise: nil) }
         
         // Clean up
         self.infoSavedRequestHead = nil
