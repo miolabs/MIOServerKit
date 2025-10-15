@@ -10,6 +10,8 @@ import Foundation
 import MIOCore
 import MIOCoreContext
 import NIOHTTP1
+import MIOCoreLogger
+
 
 public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-96a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
@@ -88,8 +90,6 @@ extension RouterContextProtocol
     
 }
 
-
-@objc
 open class RouterContext : MIOCoreContext, RouterContextProtocol
 {
     public var request: RouterRequest
@@ -101,6 +101,10 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         super.init( values )
     }
     
+    deinit {
+        Log.debug("RouterContext deinit")
+    }
+
     // Default implementations for sync methods
     open func willExecute() throws { }
     open func didExecute() throws { }
@@ -145,7 +149,7 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol
         }
         
         if request.queryParameters.isEmpty == false {
-            values.merge(request.parameters) { (_, new) in new }
+            values.merge(request.queryParameters) { (_, new) in new }
         }
         
         return values
