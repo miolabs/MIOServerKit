@@ -371,16 +371,17 @@ public class EndpointTree
         var node = subNodes[ key! ]
         var path_node = path.parts.first
         
+        // check the endpint in the sub nodes if not could be a var node
+        if let ep = node?.match(path.drop_first(), &vars) { return ep }
+        
         // Check for var nodes
-        if node == nil {
-            let var_nodes = subNodes.values.filter { $0.pathNode!.isVar }
-            if path_node == nil { return nil }
-            for n in var_nodes {
-                if n.pathNode!.match( path_node! ) {
-                    vars[ n.pathNode!.key ] = path_node!.key
-                    node = n
-                    break
-                }
+        let var_nodes = subNodes.values.filter { $0.pathNode!.isVar }
+        if path_node == nil { return nil }
+        for n in var_nodes {
+            if n.pathNode!.match( path_node! ) {
+                vars[ n.pathNode!.key ] = path_node!.key
+                node = n
+                break
             }
         }
             
@@ -401,7 +402,7 @@ public class EndpointTree
                 }
             }
         }
-            
+        
         return node?.match(path.drop_first(), &vars)
     }
     /*
