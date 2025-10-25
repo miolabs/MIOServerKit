@@ -185,7 +185,7 @@ public struct MethodEndpoint
 }
 
 // MARK: - Endpoint
-public class Endpoint// : EndpointPath
+public class Endpoint
 {
 //   public typealias RouterClass = RouterContextProtocol
         

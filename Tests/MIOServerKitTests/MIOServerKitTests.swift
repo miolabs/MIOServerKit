@@ -1,7 +1,7 @@
 import XCTest
 @testable import MIOServerKit
 
-func nop ( _ ctx: Any ) { }
+func nop ( _ ctx: any Sendable ) { }
 
 final class MIOServerKitTests: XCTestCase {
 // MARK: - RouterPath     
@@ -19,9 +19,9 @@ final class MIOServerKitTests: XCTestCase {
         let part_2 = RouterPathNode( ":value?" )
         let part_3 = RouterPathNode( ":value?\(uuidRegexRoute)" )
         
-        XCTAssertTrue( part_1.is_optional == false )
-        XCTAssertTrue( part_2.is_optional == true  )
-        XCTAssertTrue( part_3.is_optional == true  )
+        XCTAssertTrue( part_1.isOptional == false )
+        XCTAssertTrue( part_2.isOptional == true  )
+        XCTAssertTrue( part_3.isOptional == true  )
     }
     
     
@@ -73,186 +73,117 @@ final class MIOServerKitTests: XCTestCase {
         XCTAssertTrue( left2?.right.is_empty() ?? false )
     }
     
-// MARK: - Endpoint     
-    func testEndpointTree() {
-        let tree = EndpointTree( )
-        let route_1 = Endpoint( "/entity/Product" ).get( nop )
-        let route_2 = Endpoint( "/entity/ProductPlace" ).get( nop )
-        
-        tree.insert( route_1 )
-        tree.insert( route_2 )
+    // MARK: - Endpoint
+    
+    func testEndpoint() {
+        let router = Router()
+        let route_1 = router.endpoint( "/entity/Product" ).get( nop )
+        let route_2 = router.endpoint( "/entity/ProductPlace" ).get( nop )
         
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/entity/Not exists"  ), &route_vars ) == nil )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "root"                ), &route_vars ) == nil )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace" ), &route_vars ) === route_2 )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/Not exists"  ), &route_vars ) == nil )
+        XCTAssertTrue( router.root.match( RouterPath( "root"                ), &route_vars ) == nil )
+    }
+    
+    func testEndpointWithVar() {
+        let router = Router()
+        let route_1 = router.endpoint( "/entity/:name" ).get( nop )
+        var route_vars: RouterPathVars = [:]
+        
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace"     ), &route_vars ) === route_1 )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace/123" ), &route_vars ) === nil )
+        XCTAssertTrue( route_vars[ "name" ] == "ProductPlace" )
     }
 
-    func testEndpointTreeMultiMethod() {
-        let tree = EndpointTree( )
-        let route_1 = Endpoint( "/entity/Product" ).get( nop )
-        let route_2 = Endpoint( "/entity/ProductPlace" ).get( nop )
-        //let route_3 = Endpoint( "/entity/ProductPlace" ).post( nop )
-        route_2.post( nop )
-        
-        tree.insert( route_1 )
-        tree.insert( route_2 )
-        
-        tree.debug_info()
-        
-        var route_vars: RouterPathVars = [:]
-        XCTAssertEqual(route_2.methods.count, 2)
-        XCTAssertTrue( tree.match( .GET,  RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )  // xxx which one? 3 or 2??
-        XCTAssertTrue( tree.match( .POST, RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
-        XCTAssertTrue( tree.match( .GET,  RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
-        XCTAssertTrue( tree.match( .POST, RouterPath( "/entity/ProductPlace"), &route_vars ) === route_2 )
-        XCTAssertTrue( tree.match( .PUT,  RouterPath( "/entity/ProductPlace"), &route_vars ) == nil )
-        XCTAssertTrue( tree.match( .GET,  RouterPath( "/entity/Not exists"  ), &route_vars ) == nil )
-        XCTAssertTrue( tree.match( .GET,  RouterPath( "root"                ), &route_vars ) == nil )
-    }
-    
-    func testEndpointTreeVarsGoLast() {
-        let tree = EndpointTree( )
-        let route_1 = Endpoint( "/entity/:name" ).get( nop )
-        let route_2 = Endpoint( "/entity/ProductPlace" ).get( nop )
+    func testEndpointWithVars() {
+        let router = Router()
+        let route_1 = router.endpoint( "/entity/:name/:entity_id" ).get( nop )
         var route_vars: RouterPathVars = [:]
         
-        tree.insert( route_1 )
-        tree.insert( route_2 )
-        
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/entity/ProductPlace" ), &route_vars )! === route_2 )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/entity/Not_exists"   ), &route_vars )! === route_1 )
-    }
-    
-    func testEndpointWithExtraVars() {
-        let tree = EndpointTree( )
-        let route_1 = Endpoint( "/entity/:name" ).patch( nop, ":entity-id" )
-        var route_vars: RouterPathVars = [:]
-        
-        tree.insert( route_1 )
-        
-        XCTAssertTrue( tree.match( .PATCH, RouterPath( "/entity/ProductPlace"     ), &route_vars ) == nil )
-        XCTAssertTrue( tree.match( .PATCH, RouterPath( "/entity/ProductPlace/123" ), &route_vars ) === route_1 )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace"     ), &route_vars ) === nil )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace/123" ), &route_vars ) === route_1 )
         XCTAssertTrue( route_vars[ "name" ] == "ProductPlace" )
-        XCTAssertTrue( route_vars[ "entity-id" ] == "123" )
+        XCTAssertTrue( route_vars[ "entity_id" ] == "123" )
     }
     
     func testEndpointWithExtraVarsRegExp() {
-        let tree = EndpointTree( )
+        let router = Router()
         let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
         
-        let route_1 = Endpoint( "/entity/:name" ).patch( nop, ":entity-id\(asUUID)" )
+        let route_1 = router.endpoint( "/entity/:name/:entity_id\(asUUID)" ).get( nop )
         var route_vars: RouterPathVars = [:]
         
-        tree.insert( route_1 )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace"     ), &route_vars ) == nil )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace/123" ), &route_vars ) == nil )
         
-        XCTAssertTrue( tree.match( .PATCH, RouterPath( "/entity/ProductPlace"     ), &route_vars ) == nil )
-        XCTAssertTrue( tree.match( .PATCH, RouterPath( "/entity/ProductPlace/123" ), &route_vars ) == nil )
-        XCTAssertTrue( route_vars.isEmpty == true )
-        
-        XCTAssertTrue( tree.match( .PATCH, RouterPath( "/entity/ProductPlace/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) != nil )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/ProductPlace/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) === route_1 )
         XCTAssertTrue( route_vars[ "name" ] == "ProductPlace" )
-        XCTAssertTrue( route_vars[ "entity-id" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
+        XCTAssertTrue( route_vars[ "entity_id" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
     }
     
     func testEndpointWithExtraVarsRegExpPrio() {
-        let tree = EndpointTree( )
+        let router = Router()
         let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
         
-        let route_1 = Endpoint( "/entity/:name\(asUUID)" ).patch( nop )
-        let route_2 = Endpoint( "/entity/:generic-name"  ).patch( nop )
+        let route_1 = router.endpoint( "/entity/:name\(asUUID)" ).get( nop )
+        let route_2 = router.endpoint( "/entity/:generic-name"  ).get( nop )
         var route_vars: RouterPathVars = [:]
         
-        tree.insert( route_1 )
-        tree.insert( route_2 )
-        
-        XCTAssertTrue( tree.match( .PATCH, RouterPath( "/entity/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) != nil )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) != nil )
         XCTAssertTrue( route_vars[ "name" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
     }
     
     func testEndpointRealCase1() {
-        let route_home = Endpoint( "/" ).get( nop )
-        let route_hook = Endpoint( "/hook/"  ).get( nop )
-        let route_hook_version = Endpoint( "/hook/version" ).get( nop )
+        let router = Router()
+        let route_home = router.endpoint( "/" ).get( nop )
+        let route_hook = router.endpoint( "/hook/"  ).get( nop )
+        let route_hook_version = router.endpoint( "/hook/version" ).get( nop )
         
-        let route_sync_ann = Endpoint( "/schema/:scheme\(uuidRegexRoute)/sync-annotations/:sync_id?"  ).get( nop )
-        let route_sync_all_ann = Endpoint( "/schema/:scheme\(uuidRegexRoute)/all-sync-annotations"  ).get( nop )
-        
-        let tree = EndpointTree( )
-        tree.insert( route_home )
-        tree.insert( route_hook )
-        tree.insert( route_hook_version )
-        
-        let node = tree.find( RouterPath( "hook" ) )!
-        node.insert( route_sync_ann )
-        node.insert( route_sync_all_ann )
-        
+        let route_sync_ann = router.endpoint( "/hook/schema/:scheme\(uuidRegexRoute)/sync-annotations/:sync_id?"  ).get( nop )
+        let route_sync_all_ann = router.endpoint( "/hook/schema/:scheme\(uuidRegexRoute)/all-sync-annotations"  ).get( nop )
+        let route_sync_range_ann = router.endpoint( "/hook/schema/:scheme\(uuidRegexRoute)/range-sync-annotations/:from_id?/:to_id?"  ).get( nop )
+                
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/"              ), &route_vars ) === route_home )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/"         ), &route_vars ) === route_hook )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version/" ), &route_vars ) === route_hook_version )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/sync-annotations" ), &route_vars ) === route_sync_ann )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/sync-annotations/123" ), &route_vars ) === route_sync_ann )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/all-sync-annotations" ), &route_vars ) === route_sync_all_ann )
+        XCTAssertTrue( router.root.match( RouterPath( "/"              ), &route_vars ) === route_home )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook"          ), &route_vars ) === route_hook )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/"         ), &route_vars ) === route_hook )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/version/" ), &route_vars ) === route_hook_version )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/sync-annotations" ), &route_vars ) === route_sync_ann )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/sync-annotations/123" ), &route_vars ) === route_sync_ann )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/all-sync-annotations" ), &route_vars ) === route_sync_all_ann )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/range-sync-annotations" ), &route_vars ) === route_sync_range_ann )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/range-sync-annotations/1" ), &route_vars ) === route_sync_range_ann )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/schema/48D3C8B3-72AA-4441-BA47-769E03A11576/range-sync-annotations/1/2" ), &route_vars ) === route_sync_range_ann )
+        XCTAssertTrue( route_vars[ "scheme" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
+        XCTAssertTrue( route_vars[ "from_id" ] == "1" )
+        XCTAssertTrue( route_vars[ "to_id" ] == "2" )
     }
     
     func testEndpointRealCase2 ( ) {
-        let route_home = Endpoint( "/" ).get( nop )
-        let route_hook = Endpoint( "/hook/"  ).get( nop )
-        let route_hook_version = Endpoint( "/hook/version" ).get( nop )
-        
-        let tree = EndpointTree( )
-        tree.insert( route_home )
-        tree.insert( route_hook_version )
-        tree.insert( route_hook )
+        let router = Router()
+        let route_home = router.endpoint( "/" ).get( nop )
+        let route_hook = router.endpoint( "/hook/"  ).get( nop )
+        let route_hook_version = router.endpoint( "/hook/version" ).get( nop )
         
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/"              ), &route_vars ) === route_home )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
+        XCTAssertTrue( router.root.match( RouterPath( "/"              ), &route_vars ) === route_home )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook"          ), &route_vars ) === route_hook )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
     }
     
-    func testEndpointRealCase21 ( ) {
-        let route_home = Endpoint( "/" ).get( nop )
-        let route_hook_version = Endpoint( "/hook/version" ).get( nop )
-        
-        let tree = EndpointTree( )
-        tree.insert( route_home )
-        tree.insert( route_hook_version )
-        
-        tree.insert( EndpointPath( "/hook" ) )
-        let node = tree.find( RouterPath( "/hook" ) )!
-        let route_hook = Endpoint( "/" ).get( nop )
-        node.insert( route_hook )
+    func testEndpointRealCase21 ( )
+    {
+        let router = Router()
+        let route_home = router.endpoint( "/" ).get( nop )
+        let route_hook_version = router.endpoint( "/hook/version" ).get( nop )
         
         var route_vars: RouterPathVars = [:]
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/"              ), &route_vars ) === route_home )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
+        XCTAssertTrue( router.root.match( RouterPath( "/"              ), &route_vars ) === route_home )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook"          ), &route_vars ) === nil )
+        XCTAssertTrue( router.root.match( RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
     }
-    
-    func testEndpointRealCase31 ( ) {
-        let route_home = Endpoint( "/" ).get( nop )
-        let route_hook = Endpoint( "/hook/version" ).get( nop )
-        let route_hook_version = Endpoint( "/hook/version" ).get( nop )
-        
-        let tree = EndpointTree( )
-        tree.insert( route_home )
-        tree.insert( route_hook_version )
-        
-        tree.insert( EndpointPath( "/hook" ) )
-        let node = tree.find( RouterPath( "/hook" ) )!
-        let route_hook = Endpoint( "/" ).get( nop )
-        node.insert( route_hook )
-        
-        var route_vars: RouterPathVars = [:]
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/"              ), &route_vars ) === route_home )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook"          ), &route_vars ) === route_hook )
-        XCTAssertTrue( tree.match( .GET, RouterPath( "/hook/version"  ), &route_vars ) === route_hook_version )
-    }
-
 }
     
 

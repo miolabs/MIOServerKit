@@ -6,20 +6,10 @@
 //  Created by Manuel Escribano on 4/3/25.
 //
 
-import MIOServerKit
-import MIOServerKit_NIO
+@testable import MIOServerKit
 import XCTest
 import Foundation
 
-
-// MARK: - Resp handlers
-func httpFuncHandler ( context: RouterContext ) throws -> [String:Any] {
-    let response:[String:Any] = [
-        //"status": "success"
-        "url": context.request.url.absoluteString
-    ]
-    return response
-}
 
 #if !os(macOS)
 extension MIOServerKitNIOTests {
@@ -39,7 +29,7 @@ extension MIOServerKitNIOTests {
 }
 #endif
 
-func httpRootFuncHandler ( context: RouterContext ) throws -> [String:Any] {
+fileprivate func httpRootFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         //"status": "success"
         "url": "I'm Root"
@@ -47,7 +37,15 @@ func httpRootFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     return response
 }
 
-func httpFuncHandlerStr2 ( context: RouterContext ) throws -> [String:Any] {
+fileprivate func httpFuncHandler ( context: RouterContext ) throws -> [String:Any] {
+    let response:[String:Any] = [
+        //"status": "success"
+        "url": context.request.url.absoluteString
+    ]
+    return response
+}
+
+fileprivate func httpFuncHandlerStr2 ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         //"status": "success"
         "url": "Str2"
@@ -348,7 +346,7 @@ final class MIOServerKitNIOTests: XCTestCase {
 
         let (server, _) = launchServerHttp(routes)
 
-        routes.root.debug_info()
+//        routes.root.debug_info()
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
         
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
@@ -449,7 +447,7 @@ final class MIOServerKitNIOTests: XCTestCase {
     // MARK: - Async endpoint
     func testAsyncEndpoint() throws {
         let routes = Router()
-        routes.endpoint("/async").get { context in async throws -> Any? in
+        routes.endpoint("/async").get { context in
             return ["url": context.request.url.absoluteString]
         }
 

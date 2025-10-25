@@ -386,21 +386,24 @@ public class EndpointTree
         }
             
         // Check for optionals inside the node
-        if node == nil {
+        if node == nil && ( optionalPaths?.count ?? 0 ) > 0 {
             var path = path
-            node = self
+            var node:EndpointTree? = nil
             for n in optionalPaths ?? [] {
                 if path_node == nil { break }
                 if n.match( path_node! ) {
                     vars[ n.key ] = path_node!.key
                     path = path.drop_first()
                     path_node = path.parts.first
+                    node = self
                 }
                 else {
                     node = nil
                     break
                 }
             }
+            
+            return node?.match(path.drop_first(), &vars)
         }
         
         return node?.match(path.drop_first(), &vars)
