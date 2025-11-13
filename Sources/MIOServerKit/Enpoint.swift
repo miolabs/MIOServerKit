@@ -130,6 +130,7 @@ public struct MethodEndpoint
         {
             do {
                 let ctx = try T.init( request, response )
+                
                 try await ctx.willExecute()
                 var result:Any? = try await cb( ctx )
                 try await ctx.didExecute()
@@ -138,7 +139,7 @@ public struct MethodEndpoint
                 for (k,v) in ctx.responseHeaders() {
                     response.headers.replaceOrAdd( name: k, value: v )
                 }
-
+                
                 result = try ctx.responseBodyData( result )
                 
                 completion( result, nil )

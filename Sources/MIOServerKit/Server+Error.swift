@@ -9,14 +9,16 @@
 import Foundation
 import NIOHTTP1
 
-public protocol ServerErrorCodeProtocol
+public protocol ServerErrorProtocol
 {
     var errorCode: HTTPResponseStatus { get }
+    var body:Data { get }
 }
 
 public enum ServerError: Error
 {
     case general ( _ errorCode: HTTPResponseStatus, _ message:String, _ functionName: String = #function)
+    case custom ( _ errorCode: HTTPResponseStatus, _ body:Data, _ functionName: String = #function)
     case endpointNotFound ( _ path:String, _ method:String, _ functionName: String = #function)
     case missingJSONBody(_ functionName : String = #function )
     case invalidJSONBodyCast(_ functionName: Any = #function)
@@ -24,6 +26,17 @@ public enum ServerError: Error
     case invalidBodyData(_ parameterName: String, _ functionName: Any = #function)
     case invalidContext (_ functionName: String = #function)
     case loadingSettings (_ message:String, _ functionName: String = #function)
+    
+    init(error: Error) {
+        switch error {
+        case let err as ServerErrorProtocol:
+            self = .custom(err.errorCode, err.body)
+        case let error as LocalizedError:
+            self = .general(.internalServerError, error.localizedDescription)
+        default:
+            self = .general(.internalServerError, "Unknown Error")
+        }
+    }
 }
 
 extension ServerError: LocalizedError
@@ -31,6 +44,7 @@ extension ServerError: LocalizedError
     public var errorDescription: String?
     {
         switch self {
+        case let .custom( _, body, _ ): return "\(body)"
         case let .general( _, message, _ ): return message
         case let .endpointNotFound( path, method, _ ): return "Endpoint not found. \(method) \(path)"
         case .missingJSONBody( _ ): return "Missing JSON Body"
@@ -46,6 +60,9 @@ extension ServerError: LocalizedError
     {
         switch self
         {
+            case let .custom( _, body, functionName ):
+            return "\(body). \(functionName)"
+            
             case let .general( _, message, functionName ):
             return "\(message). \(functionName)"
             
@@ -73,7 +90,7 @@ extension ServerError: LocalizedError
     }
 }
 
-extension ServerError : ServerErrorCodeProtocol
+extension ServerError : ServerErrorProtocol
 {
     public var errorCode: HTTPResponseStatus {
         switch self {
@@ -82,4 +99,6 @@ extension ServerError : ServerErrorCodeProtocol
         default: return .internalServerError
         }
     }
+    
+    public var body: Data { return self.localizedDescription.data(using: .utf8) ?? "Unknown Error".data(using: .utf8)! }
 }
