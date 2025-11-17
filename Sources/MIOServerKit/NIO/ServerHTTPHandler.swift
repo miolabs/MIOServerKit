@@ -190,7 +190,7 @@ class ServerHTTPHandler: ChannelInboundHandler
         self.buffer.clear()
         
         if let error = error {
-            handle_error(error: ServerError( error: error ), context: context)
+            handle_error(error: error, context: context)
         }
         else {
             do {
@@ -209,7 +209,7 @@ class ServerHTTPHandler: ChannelInboundHandler
                 }
             }
             catch {
-                handle_error( error: ServerError( error: error ), context: context )
+                handle_error( error: error, context: context )
             }
         }
         
@@ -227,11 +227,22 @@ class ServerHTTPHandler: ChannelInboundHandler
     }
     
     // Method to handle errors
-    private func handle_error(error:ServerError, context: ChannelHandlerContext)
+    private func handle_error(error:Error, context: ChannelHandlerContext)
     {
         Log.debug( "\(error)" )
-        response.status = error.errorCode
-        self.buffer.writeData(error.body)
+        
+        if let err = error as? ServerErrorProtocol {
+            response.headers.replaceOrAdd(name: .contentType, value: err.contentType)
+            response.status = err.errorCode
+            self.buffer.writeData(err.body)
+        }
+        else {
+            response.headers.replaceOrAdd(name: .contentType, value: "text/plain; charset=utf-8")
+            response.status = .internalServerError
+            let msg = "Internal Server Error: \(error)"
+            let data = msg.data(using: .utf8)!
+            self.buffer.writeData(data)
+        }
     }
 
     // Helper method to write the response on the event loop thread

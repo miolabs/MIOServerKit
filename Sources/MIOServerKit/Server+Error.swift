@@ -12,6 +12,7 @@ import NIOHTTP1
 public protocol ServerErrorProtocol
 {
     var errorCode: HTTPResponseStatus { get }
+    var contentType:String { get }
     var body:Data { get }
 }
 
@@ -90,6 +91,7 @@ extension ServerError: LocalizedError
     }
 }
 
+/*
 extension ServerError : ServerErrorProtocol
 {
     public var errorCode: HTTPResponseStatus {
@@ -100,5 +102,8 @@ extension ServerError : ServerErrorProtocol
         }
     }
     
+    public var contentType: String { return "text/plain; charset=utf-8" }
+    
     public var body: Data { return self.localizedDescription.data(using: .utf8) ?? "Unknown Error".data(using: .utf8)! }
 }
+ */
