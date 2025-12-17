@@ -18,7 +18,7 @@ class ServerHTTPHandler: ChannelInboundHandler
 {
     public typealias InboundIn = HTTPServerRequestPart
     public typealias OutboundOut = HTTPServerResponsePart
-        
+                
     private enum State {
         case idle
         case waitingForRequestBody
@@ -48,7 +48,11 @@ class ServerHTTPHandler: ChannelInboundHandler
     private var infoSavedBodyBytes: Int = 0
     private var infoSavedBodyBuffer: ByteBuffer? = nil
     
-//    private var continuousCount: Int = 0
+    private var idleTimeout: Scheduled<Void>?
+    private let idleTimeoutDuration: TimeAmount = .seconds(60)
+    
+    private var requestCount = 0
+    private let maxRequestsPerConnection = 100
     
     var request:RouterRequest!
     var response:RouterResponse!
@@ -65,12 +69,21 @@ class ServerHTTPHandler: ChannelInboundHandler
         Log.debug("ServerHTTPHandler deinit")
     }
     
+    func handlerAdded(context: ChannelHandlerContext) {
+        self.buffer = context.channel.allocator.buffer(capacity: 0)
+        scheduleIdleTimeout(context: context)
+        Log.debug("handlerAdded")
+    }
+    
     func handlerRemoved(context: ChannelHandlerContext) {
+        cancelIdleTimeout()
         Log.debug("handlerRemoved")
     }
     
     func channelInactive(context: ChannelHandlerContext) {
-        Log.debug("channelInactive"); context.fireChannelInactive()
+        cancelIdleTimeout()
+        Log.debug("channelInactive")
+        context.fireChannelInactive()
     }
     
     private func dispatch_request( _ context: ChannelHandlerContext, completion: @escaping MethodEndpointCompletionBlock )
@@ -144,11 +157,18 @@ class ServerHTTPHandler: ChannelInboundHandler
                    
     func channelRead(context: ChannelHandlerContext, data: NIOAny) 
     {
+        cancelIdleTimeout()
+        
         let reqPart = self.unwrapInboundIn(data)
         
         switch reqPart {
         case .head(let http_request):
             self.keepAlive = http_request.isKeepAlive
+            self.requestCount += 1
+                                                
+            if self.requestCount >= self.maxRequestsPerConnection {
+                self.keepAlive = false
+            }
             
             infoSavedRequestHead = http_request
             self.infoSavedBodyBytes = 0
@@ -215,7 +235,9 @@ class ServerHTTPHandler: ChannelInboundHandler
         
         self.write_response( context: context )
         self.complete_response(context, trailers: nil, promise: nil)
-        if self.keepAlive == false { context.close(promise: nil) }
+        if self.keepAlive {
+            scheduleIdleTimeout(context: context)
+        }
         
         // Clean up
         self.infoSavedRequestHead = nil
@@ -281,10 +303,18 @@ class ServerHTTPHandler: ChannelInboundHandler
         context.flush()
     }
 
-    func handlerAdded(context: ChannelHandlerContext) {
-        self.buffer = context.channel.allocator.buffer(capacity: 0)
+    private func scheduleIdleTimeout(context: ChannelHandlerContext) {
+        idleTimeout = context.eventLoop.scheduleTask(in: idleTimeoutDuration) {
+            Log.debug("Connection idle timeout, closing")
+            context.close(promise: nil)
+        }
     }
-
+    
+    private func cancelIdleTimeout() {
+        idleTimeout?.cancel()
+        idleTimeout = nil
+    }
+    
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
         case let evt as ChannelEvent where evt == ChannelEvent.inputClosed:
