@@ -11,16 +11,27 @@ import Foundation
 import NIO
 import NIOHTTP1
 import MIOCoreLogger
+import MIOCore
 
 open class NIOServer: Server
 {
-    let threadPool = NIOThreadPool(numberOfThreads: System.coreCount)
-    let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+    let threadPool:NIOThreadPool
+    let group:MultiThreadedEventLoopGroup
     let startedPromise = MultiThreadedEventLoopGroup(numberOfThreads: 1).next().makePromise(of: Void.self)
     
     var bootstrap: ServerBootstrap!
     var channel: Channel!
         
+    public override init(routes: Router)
+    {
+        // Thread pool is usually tied to IO bound. Can be create more threads. Between 16 or 32 is a good balance
+        let max_threads = MIOCoreIntValue( MCEnvironmentVar( "MIO_SERVER_KIT_MAX_THREADS"), 16 )!
+        threadPool = NIOThreadPool(numberOfThreads: max_threads)
+        // LoopGroup is tied to CPU bound so if better to keep to System.coreCount
+        group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+        super.init(routes: routes)
+    }
+    
     open override func run ( port: Int )
     {
         Log.trace( "Starting NIO Server on port \(port). System coreCount: \(System.coreCount)")
