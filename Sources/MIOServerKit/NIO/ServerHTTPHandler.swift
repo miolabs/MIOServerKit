@@ -131,21 +131,41 @@ class ServerHTTPHandler: ChannelInboundHandler
             switch endpoint_spec.executionType {
             case .sync:
                 // Offload sync endpoints to the thread pool.
-                threadPool.submit { _ in
+                threadPool.runIfActive(eventLoop: loop) { () -> Void in
                     endpoint_spec.run(req, res) { result, error in
                         // Always hop back to the channel's event loop before touching NIO.
                         loop.execute {
                             completion(result, error)
                         }
                     }
+                }.whenFailure { error in
+                    loop.execute {
+                        completion(nil, error)
+                    }
                 }
+            
             case .async:
-                // Run with Swift Concurrency; hop back to the event loop in the callback.
-                Task.detached {
-                    await endpoint_spec.run(req, res) { result, error in
+                threadPool.runIfActive(eventLoop: loop) { () -> Void in
+                    let semaphore = DispatchSemaphore(value: 0)
+                    var capturedResult: (Any?, Error?)?
+                    
+                    Task {
+                        await endpoint_spec.run(req, res) { result, error in
+                            capturedResult = (result, error)
+                            semaphore.signal()
+                        }
+                    }
+                    
+                    semaphore.wait()
+                    
+                    if let (result, error) = capturedResult {
                         loop.execute {
                             completion(result, error)
                         }
+                    }
+                }.whenFailure { error in
+                    loop.execute {
+                        completion(nil, error)
                     }
                 }
             }
