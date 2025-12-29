@@ -34,7 +34,7 @@ open class NIOServer: Server
     
     open override func run ( port: Int )
     {
-        Log.trace( "Starting NIO Server on port \(port). System coreCount: \(System.coreCount)")
+        Log.trace( "Starting NIO Server on port \(port). System coreCount: \(System.coreCount), thread pool: \(threadPool.numberOfThreads)")
         super.run( port: port )
         threadPool.start()
         
