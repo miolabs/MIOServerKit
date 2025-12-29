@@ -131,7 +131,7 @@ class ServerHTTPHandler: ChannelInboundHandler
             switch endpoint_spec.executionType {
             case .sync:
                 // Offload sync endpoints to the thread pool.
-                Log.trace("Starting sync endpoint - active threads: \(threadPool.numberOfThreads)")
+                Log.trace("Starting sync endpoint")
                 threadPool.runIfActive(eventLoop: loop) { () -> Void in
                     Log.trace("Thread pool work starting")
                     endpoint_spec.run(req, res) { result, error in
