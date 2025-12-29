@@ -131,14 +131,19 @@ class ServerHTTPHandler: ChannelInboundHandler
             switch endpoint_spec.executionType {
             case .sync:
                 // Offload sync endpoints to the thread pool.
+                Log.trace("Starting sync endpoint - active threads: \(threadPool.numberOfThreads)")
                 threadPool.runIfActive(eventLoop: loop) { () -> Void in
+                    Log.trace("Thread pool work starting")
                     endpoint_spec.run(req, res) { result, error in
+                        Log.trace("Endpoint completed")
                         // Always hop back to the channel's event loop before touching NIO.
                         loop.execute {
                             completion(result, error)
                         }
                     }
-                }.whenFailure { error in
+                }
+                .whenFailure { error in
+                    Log.trace("Endpoint fail")
                     loop.execute {
                         completion(nil, error)
                     }
@@ -163,7 +168,8 @@ class ServerHTTPHandler: ChannelInboundHandler
                             completion(result, error)
                         }
                     }
-                }.whenFailure { error in
+                }
+                .whenFailure { error in
                     loop.execute {
                         completion(nil, error)
                     }
