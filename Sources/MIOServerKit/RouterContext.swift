@@ -8,7 +8,6 @@
 
 import Foundation
 import MIOCore
-import MIOCoreContext
 import NIOHTTP1
 import MIOCoreLogger
 

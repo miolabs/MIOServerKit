@@ -55,7 +55,6 @@ let package = Package(
             name: "MIOServerKit",
             dependencies: [
                 .product(name: "MIOCore", package: "MIOCore"),
-                .product(name: "MIOCoreContext", package: "MIOCore"),
                 .product(name: "MIOCoreLogger", package: "MIOCore"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
