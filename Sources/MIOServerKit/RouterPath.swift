@@ -50,10 +50,25 @@ public final class RouterPathNode: Equatable
     }
         
     public func match ( _ node: RouterPathNode ) -> Bool {
-        return isVar && node.isVar ? name == node.name
-             : regex != nil ?
-               regex!.firstMatch( in: node.name, options: [], range: NSRange( location: 0, length: node.name.count ) ) != nil
-             : isVar || name == node.name
+        // Two var-vs-var: structural identity (same `:name(...)` literal).
+        if isVar && node.isVar { return name == node.name }
+
+        // Regex-constrained var matching a concrete path segment: require
+        // the regex to match the FULL input string, not just a substring.
+        // Using firstMatch alone would treat e.g. `[0-9]+` as matching the
+        // leading "48" of a UUID like "48D3C8B3-..." — surfacing as a
+        // sibling-route ambiguity that varsAreAmbiguous can't detect.
+        if let regex {
+            let range = NSRange( location: 0, length: node.name.utf16.count )
+            guard let m = regex.firstMatch( in: node.name, options: [], range: range ) else {
+                return false
+            }
+            return m.range == range
+        }
+
+        // Unconstrained var: matches any concrete segment.
+        // Literal node: matches by name.
+        return isVar || name == node.name
     }
 }
 

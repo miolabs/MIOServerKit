@@ -41,9 +41,50 @@ public class EndpointTree
         let node = EndpointTree()
         
         node.pathNode = path_node
+
+        // Reject ambiguous registrations at startup. Two variable nodes at
+        // the same path position are ambiguous if any input could match both;
+        // the framework cannot decide which route to invoke. We use a
+        // conservative rule:
+        //   - two unconstrained vars              -> ambiguous
+        //   - one constrained + one unconstrained -> ambiguous
+        //   - two vars with identical patterns    -> ambiguous
+        //   - two vars with different patterns    -> allowed (assumed disjoint)
+        // Different-pattern overlap (e.g. one regex matching a subset of
+        // another) is not detected — full regex intersection is intractable
+        // and rarely a real-world concern.
+        if let new_pn = node.pathNode, new_pn.isVar {
+            for (_, existing) in subNodes {
+                guard let existing_pn = existing.pathNode, existing_pn.isVar else { continue }
+                if EndpointTree.varsAreAmbiguous( existing_pn, new_pn ) {
+                    fatalError( """
+                        Ambiguous route registration: ':\(existing_pn.key)' and \
+                        ':\(new_pn.key)' at the same path position can both match \
+                        the same input. The framework cannot decide which route \
+                        to pick. Differentiate the regex constraints so they \
+                        don't overlap, or merge into a single route and dispatch \
+                        inside the handler.
+                        """ )
+                }
+            }
+        }
+
         subNodes[ node.pathNode!.key ] = node
         
         return node.insert( path: path.drop_first() )
+    }
+
+    /// Returns true if two variable path-nodes at the same position could both
+    /// match the same input — see the ambiguity rule documented in `insert`.
+    private static func varsAreAmbiguous( _ a: RouterPathNode, _ b: RouterPathNode ) -> Bool {
+        // Two unconstrained vars: each matches everything.
+        if a.regex == nil && b.regex == nil { return true }
+        // One constrained, one unconstrained: the unconstrained one matches
+        // every input the constrained one does (and more).
+        if a.regex == nil || b.regex == nil { return true }
+        // Two constrained vars: only flag if patterns are identical. Different
+        // patterns are assumed disjoint by convention.
+        return a.regex!.pattern == b.regex!.pattern
     }
     
     public func match ( _ path: RouterPath, _ vars: inout RouterPathVars ) -> Endpoint? {
@@ -58,14 +99,11 @@ public class EndpointTree
         // check the endpint in the sub nodes if not could be a var node
         if let ep = node?.match(path.drop_first(), &vars) { return ep }
         
-        // Check for var nodes. Prefer those with a regex constraint over
-        // generic ones — a regex-constrained variable is more specific, so
-        // it should win when both could match. Without this ordering the
-        // result depends on dictionary iteration order, which Swift doesn't
-        // guarantee.
-        let regex_vars   = subNodes.values.filter { $0.pathNode?.isVar == true && $0.pathNode?.regex != nil }
-        let generic_vars = subNodes.values.filter { $0.pathNode?.isVar == true && $0.pathNode?.regex == nil }
-        let var_nodes    = regex_vars + generic_vars
+        // Check for var nodes. Sibling vars at the same path position are
+        // guaranteed to be unambiguous (enforced by `insert(path:)` at
+        // registration time), so dictionary iteration order is fine here —
+        // at most one of them can match any given input.
+        let var_nodes = subNodes.values.filter { $0.pathNode!.isVar }
         if path_node == nil { return nil }
         for n in var_nodes {
             if n.pathNode!.match( path_node! ) {

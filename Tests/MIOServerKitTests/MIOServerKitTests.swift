@@ -123,16 +123,30 @@ final class MIOServerKitTests: XCTestCase {
         XCTAssertTrue( route_vars[ "entity_id" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
     }
     
-    func testEndpointWithExtraVarsRegExpPrio() {
+    // Two variable routes at the same position are allowed to coexist as
+    // long as their regex constraints are different (and assumed disjoint).
+    // Routes that could BOTH match the same input — e.g. an unconstrained
+    // var alongside any other var, or two vars with identical regexes — are
+    // rejected at registration time with a fatalError. See EndpointTree.insert
+    // for the rule. The previous testEndpointWithExtraVarsRegExpPrio asserted
+    // a priority order between an unconstrained and a regex-constrained var
+    // for the same path position; that scenario is now invalid by definition
+    // and would crash at startup.
+    func testEndpointWithDisjointRegexes() {
         let router = Router()
-        let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-        
-        _ = router.endpoint( "/entity/:name\(asUUID)" ).get( nop )
-        _ = router.endpoint( "/entity/:generic-name"  ).get( nop )
+        let asUUID   = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+        let asDigits = "([0-9]+)"
+
+        let route_uuid   = router.endpoint( "/entity/:id\(asUUID)"   ).get( nop )
+        let route_digits = router.endpoint( "/entity/:num\(asDigits)" ).get( nop )
+
         var route_vars: RouterPathVars = [:]
-        
-        XCTAssertTrue( router.root.match( RouterPath( "/entity/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) != nil )
-        XCTAssertTrue( route_vars[ "name" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) === route_uuid )
+        XCTAssertTrue( route_vars[ "id" ] == "48D3C8B3-72AA-4441-BA47-769E03A11576" )
+
+        var route_vars2: RouterPathVars = [:]
+        XCTAssertTrue( router.root.match( RouterPath( "/entity/12345" ), &route_vars2 ) === route_digits )
+        XCTAssertTrue( route_vars2[ "num" ] == "12345" )
     }
     
     func testEndpointRealCase1() {
