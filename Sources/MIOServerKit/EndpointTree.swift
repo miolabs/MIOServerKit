@@ -58,8 +58,14 @@ public class EndpointTree
         // check the endpint in the sub nodes if not could be a var node
         if let ep = node?.match(path.drop_first(), &vars) { return ep }
         
-        // Check for var nodes
-        let var_nodes = subNodes.values.filter { $0.pathNode!.isVar }
+        // Check for var nodes. Prefer those with a regex constraint over
+        // generic ones — a regex-constrained variable is more specific, so
+        // it should win when both could match. Without this ordering the
+        // result depends on dictionary iteration order, which Swift doesn't
+        // guarantee.
+        let regex_vars   = subNodes.values.filter { $0.pathNode?.isVar == true && $0.pathNode?.regex != nil }
+        let generic_vars = subNodes.values.filter { $0.pathNode?.isVar == true && $0.pathNode?.regex == nil }
+        let var_nodes    = regex_vars + generic_vars
         if path_node == nil { return nil }
         for n in var_nodes {
             if n.pathNode!.match( path_node! ) {
