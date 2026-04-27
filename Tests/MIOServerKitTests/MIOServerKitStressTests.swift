@@ -32,15 +32,17 @@ import Foundation
 #if !os(macOS)
 extension MIOServerKitStressTests {
     static var allTests = [
-        ( "testStress_HighConcurrencyFastRequests",                testStress_HighConcurrencyFastRequests ),
-        ( "testStress_SlowEndpointThreadPoolSaturation",           testStress_SlowEndpointThreadPoolSaturation ),
-        ( "testStress_SustainedLoad",                              testStress_SustainedLoad ),
-        ( "testStress_AsyncEndpointsUnderLoad",                    testStress_AsyncEndpointsUnderLoad ),
-        ( "testStress_MixedSyncAsyncEndpoints",                    testStress_MixedSyncAsyncEndpoints ),
-        ( "testStress_ConnectionChurn",                            testStress_ConnectionChurn ),
+        ( "testStress_HighConcurrencyFastRequests",                  testStress_HighConcurrencyFastRequests ),
+        ( "testStress_SlowEndpointThreadPoolSaturation",             testStress_SlowEndpointThreadPoolSaturation ),
+        ( "testStress_SustainedLoad",                                testStress_SustainedLoad ),
+        ( "testStress_AsyncEndpointsUnderLoad",                      testStress_AsyncEndpointsUnderLoad ),
+        ( "testStress_MixedSyncAsyncEndpoints",                      testStress_MixedSyncAsyncEndpoints ),
+        ( "testStress_ConnectionChurn",                              testStress_ConnectionChurn ),
         ( "testStress_StuckAsyncHandlers_DoNotPinThreadPoolWorkers", testStress_StuckAsyncHandlers_DoNotPinThreadPoolWorkers ),
-        ( "testStress_StuckSyncHandlers_DoNotBlockSystemEndpoint",  testStress_StuckSyncHandlers_DoNotBlockSystemEndpoint ),
-        ( "testStress_StuckHandlers_ServerStaysResponsive",        testStress_StuckHandlers_ServerStaysResponsive ),
+        ( "testStress_StuckSyncHandlers_DoNotBlockSystemEndpoint",   testStress_StuckSyncHandlers_DoNotBlockSystemEndpoint ),
+        ( "testStress_StuckHandlers_ServerStaysResponsive",          testStress_StuckHandlers_ServerStaysResponsive ),
+        ( "testStress_SyncHandlers_ActuallyRunInParallel",           testStress_SyncHandlers_ActuallyRunInParallel ),
+        ( "testStress_AsyncHandlers_ActuallyRunInParallel",          testStress_AsyncHandlers_ActuallyRunInParallel ),
     ]
 }
 #endif
@@ -136,6 +138,89 @@ fileprivate func stuckSyncHandler( context: RouterContext ) throws -> [String:An
 @Sendable
 fileprivate func stressSystemHealthHandler( context: RouterContext ) throws -> String {
     return "OK"
+}
+
+
+// MARK: - Parallelism observer
+//
+// Throughput tests ("1000 requests in 2 seconds") prove the server is fast,
+// but they can't distinguish genuine parallelism from a fast serial loop.
+// To prove parallelism we need to observe overlapping execution: at least
+// two handlers running at the same wall-clock instant on different threads.
+//
+// The observer below records entry/exit per handler and tracks (a) peak
+// in-flight count and (b) the set of distinct OS threads that ran handlers.
+// Tests assert peak > 1 and threads > 1 — weak bounds chosen because
+// they're robust against scheduler variance, but strong enough to fail
+// loudly if the pool collapses to size 1 or the dispatcher accidentally
+// serializes work.
+
+fileprivate final class ConcurrencyObserver: @unchecked Sendable {
+    private let lock = NSLock()
+    private var inFlight   : Int          = 0
+    private var maxInFlight: Int          = 0
+    private var threadIDs  : Set<UInt64>  = []
+    private var sampleCount: Int          = 0
+
+    /// Returns the current OS thread identity. Different mechanism per
+    /// platform; we only need a stable per-thread token for the duration
+    /// of one test, not portable thread IDs.
+    private func currentThreadID() -> UInt64 {
+        #if canImport(Darwin)
+        return UInt64( pthread_mach_thread_np( pthread_self() ) )
+        #else
+        // pthread_self returns an opaque handle; on Linux it's typically a
+        // pointer-sized value safe to hash for identity comparison.
+        return UInt64( UInt( bitPattern: unsafeBitCast(pthread_self(), to: Int.self) ) )
+        #endif
+    }
+
+    /// Marks handler entry. Caller MUST call exit() in defer.
+    func enter() {
+        let tid = currentThreadID()
+        lock.lock()
+        inFlight += 1
+        if inFlight > maxInFlight { maxInFlight = inFlight }
+        threadIDs.insert( tid )
+        sampleCount += 1
+        lock.unlock()
+    }
+
+    func exit() {
+        lock.lock()
+        inFlight -= 1
+        lock.unlock()
+    }
+
+    func snapshot() -> ( peak: Int, threads: Int, samples: Int ) {
+        lock.lock(); defer { lock.unlock() }
+        return ( peak: maxInFlight, threads: threadIDs.count, samples: sampleCount )
+    }
+
+    /// Resets between tests. Call at the start of each test that uses the
+    /// observer, otherwise samples from prior tests leak in.
+    func reset() {
+        lock.lock()
+        inFlight    = 0
+        maxInFlight = 0
+        threadIDs.removeAll()
+        sampleCount = 0
+        lock.unlock()
+    }
+}
+
+fileprivate let parallelismObserver = ConcurrencyObserver()
+
+/// Sync handler that sleeps long enough for overlap to be observable.
+/// 100ms is well above OS scheduling jitter on localhost — if two of
+/// these handlers were dispatched simultaneously, both will be observed
+/// in flight at the same instant when measured.
+@Sendable
+fileprivate func parallelSyncHandler( context: RouterContext ) throws -> [String:Any] {
+    parallelismObserver.enter()
+    defer { parallelismObserver.exit() }
+    Thread.sleep( forTimeInterval: 0.1 )
+    return [ "ok": true ]
 }
 
 
@@ -246,6 +331,14 @@ final class MIOServerKitStressTests: XCTestCase
     // probes default to 1s; we use 2s to leave headroom for CI noise but still
     // fail loudly if the system path goes through the pool.
     private static let systemEndpointTimeout: TimeInterval = 2
+
+    // Parallelism tests. With handlers that sleep 100ms, dispatching N=32
+    // requests at concurrency 32 should produce a peak in-flight count
+    // well above 1. The exact peak depends on pool size and scheduler
+    // variance — we only assert >1 (parallelism exists) and >=2 distinct
+    // threads (work is genuinely distributed, not multiplexed on one).
+    private static let parallelismRequestCount    = 32
+    private static let parallelismConcurrency     = 32
     
     // MARK: high concurrency, no blocking work
     func testStress_HighConcurrencyFastRequests() throws {
@@ -612,5 +705,100 @@ final class MIOServerKitStressTests: XCTestCase
         XCTAssertEqual( syncStats.success,   Self.isolationVerifyTotal, "Sync endpoint failed: \(syncStats.description)" )
         XCTAssertEqual( asyncStats.success,  Self.isolationVerifyTotal, "Async endpoint failed: \(asyncStats.description)" )
         XCTAssertEqual( systemStats.success, Self.isolationVerifyTotal, "System endpoint failed: \(systemStats.description)" )
+    }
+
+
+    // MARK: sync handlers actually execute in parallel
+    //
+    // Throughput tests show "many requests succeeded fast" but don't prove the
+    // server is genuinely running them in parallel — a fast serialized server
+    // would pass them too. This test instruments handlers to record their
+    // entry/exit and asserts at least 2 handlers were observed in flight at
+    // the same instant on at least 2 distinct threads.
+    //
+    // Property: with 32 concurrent requests against a sync endpoint that
+    // sleeps 100ms, peak in-flight should be well above 1 (the NIOThreadPool
+    // is sized at 16 by default, so we expect peak ~= min(32, 16)).
+    //
+    // Failure modes this catches:
+    //   - NIOThreadPool collapsed to size 1 by config or env var
+    //   - Dispatcher accidentally serializing work via a shared lock
+    //   - All work landing on the EventLoop instead of the pool
+    func testStress_SyncHandlers_ActuallyRunInParallel() throws {
+        parallelismObserver.reset()
+
+        let routes = Router()
+        routes.endpoint( "/parallel" ).get( parallelSyncHandler )
+        let (server, _) = launchServerHttp( routes )
+        defer { try? server.terminateServer() }
+
+        let stats = runConcurrentGets( url: "http://localhost:8080/parallel"
+                                     , total: Self.parallelismRequestCount
+                                     , concurrency: Self.parallelismConcurrency
+                                     , timeoutSeconds: 30 )
+
+        let snap = parallelismObserver.snapshot()
+        print( "[stress.parallel.sync] requests=\(stats.success) peak-in-flight=\(snap.peak) threads=\(snap.threads) samples=\(snap.samples)" )
+
+        XCTAssertEqual( stats.success, Self.parallelismRequestCount
+                      , "Parallel sync requests failed: \(stats.description)" )
+        XCTAssertEqual( snap.samples, Self.parallelismRequestCount
+                      , "Observer didn't see all handlers — instrumentation broken?" )
+        XCTAssertGreaterThan( snap.peak, 1
+                            , "Sync handlers ran serialized — only one in flight at a time. " +
+                              "NIOThreadPool may be misconfigured (size 1) or dispatch is " +
+                              "accidentally serializing." )
+        XCTAssertGreaterThan( snap.threads, 1
+                            , "All sync handlers ran on a single thread — pool collapsed." )
+    }
+
+
+    // MARK: async handlers actually execute in parallel
+    //
+    // The async path runs handlers on Swift Concurrency's cooperative
+    // executor, not the NIOThreadPool. Different mechanism, same property
+    // to verify: dispatching N concurrent async handlers must result in
+    // observable overlap.
+    //
+    // The cooperative executor's pool is typically sized to active core
+    // count (varies by host) so the threshold for "this is parallel"
+    // differs from sync, but the >1 floor is still the meaningful check.
+    func testStress_AsyncHandlers_ActuallyRunInParallel() throws {
+        parallelismObserver.reset()
+
+        let routes = Router()
+        routes.endpoint( "/parallel-async" ).get { ( ctx: RouterContext ) async throws -> Any? in
+            parallelismObserver.enter()
+            defer { parallelismObserver.exit() }
+            try await Task.sleep( nanoseconds: 100_000_000 )   // 100ms
+            return [ "ok": true ]
+        }
+        let (server, _) = launchServerHttp( routes )
+        defer { try? server.terminateServer() }
+
+        let stats = runConcurrentGets( url: "http://localhost:8080/parallel-async"
+                                     , total: Self.parallelismRequestCount
+                                     , concurrency: Self.parallelismConcurrency
+                                     , timeoutSeconds: 30 )
+
+        let snap = parallelismObserver.snapshot()
+        print( "[stress.parallel.async] requests=\(stats.success) peak-in-flight=\(snap.peak) threads=\(snap.threads) samples=\(snap.samples)" )
+
+        XCTAssertEqual( stats.success, Self.parallelismRequestCount
+                      , "Parallel async requests failed: \(stats.description)" )
+        XCTAssertEqual( snap.samples, Self.parallelismRequestCount
+                      , "Observer didn't see all handlers — instrumentation broken?" )
+        XCTAssertGreaterThan( snap.peak, 1
+                            , "Async handlers ran serialized — cooperative executor may be " +
+                              "sized to 1, or the dispatcher's promise bridge is forcing " +
+                              "serial execution." )
+        // Note: thread count for async can be lower than for sync — the
+        // cooperative executor is typically sized to active core count, not
+        // 16. On a single-core CI runner this could legitimately be 1.
+        // We still assert >1 because all current CI environments have
+        // multiple cores; relax if a future single-core target needs it.
+        XCTAssertGreaterThan( snap.threads, 1
+                            , "All async handlers ran on a single thread — cooperative " +
+                              "executor may be collapsed or running on a single-core host." )
     }
 }
