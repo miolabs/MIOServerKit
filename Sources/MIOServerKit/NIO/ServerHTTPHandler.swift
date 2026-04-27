@@ -294,6 +294,12 @@ class ServerHTTPHandler: ChannelInboundHandler
             response.status = err.errorCode
             self.buffer.writeData(err.body)
         }
+        else if let err = error as? ServerError {
+            response.headers.replaceOrAdd(name: .contentType, value: "text/plain; charset=utf-8")
+            response.status = err.httpStatus
+            let data = err.localizedDescription.data(using: .utf8)!
+            self.buffer.writeData(data)
+        }
         else {
             response.headers.replaceOrAdd(name: .contentType, value: "text/plain; charset=utf-8")
             response.status = .internalServerError

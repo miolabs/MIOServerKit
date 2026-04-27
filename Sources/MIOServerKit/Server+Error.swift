@@ -91,19 +91,13 @@ extension ServerError: LocalizedError
     }
 }
 
-/*
-extension ServerError : ServerErrorProtocol
-{
-    public var errorCode: HTTPResponseStatus {
+extension ServerError {
+    public var httpStatus: HTTPResponseStatus {
         switch self {
         case .general( let code, _, _ ): return code
+        case .custom( let code, _, _ ): return code
         case .endpointNotFound: return .notFound
         default: return .internalServerError
         }
     }
-    
-    public var contentType: String { return "text/plain; charset=utf-8" }
-    
-    public var body: Data { return self.localizedDescription.data(using: .utf8) ?? "Unknown Error".data(using: .utf8)! }
 }
-*/
