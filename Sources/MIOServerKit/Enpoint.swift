@@ -153,6 +153,7 @@ public struct MethodEndpoint
     }
     
     public enum EndpointExecutionType {
+        case system
         case sync
         case async
     }
@@ -162,6 +163,13 @@ public struct MethodEndpoint
     var _execution_type: EndpointExecutionType
     public var executionType : EndpointExecutionType { return _execution_type }
 
+    // Init for system callbacks
+    init <T:RouterContext>(systemCb: @escaping SyncEndpointRequestDispatcher<T>, extraUrl: RouterPath? = nil) {
+        wrapper = SyncEndpointWrapper(systemCb)
+        extra_url = extraUrl
+        _execution_type = .system
+    }
+    
     // Init for sync callbacks
     init <T:RouterContext>(cb: @escaping SyncEndpointRequestDispatcher<T>, extraUrl: RouterPath? = nil ) {
         wrapper = SyncEndpointWrapper( cb )
@@ -256,38 +264,6 @@ public class Endpoint
         return self
     }
 /*
-    override public func match ( _ method: EndpointMethod, _ url: RouterPath, _ vars: inout RouterPathVars ) -> RouterPathDiff? {
-        if methods[ method ] == nil { return nil }
-
-        var super_vars: RouterPathVars = [:]
-
-        if var ret = super.match( method, url, &super_vars ) {
-            let entry = methods[ method ]
-            var extra_vars: RouterPathVars = [:]
-
-            if entry?.extra_url != nil {
-                if !ret.right.is_empty() {
-                    if let extra_ret = entry?.extra_url!.match( ret.right, &extra_vars ) {
-                        ret.common.join( extra_ret.common )
-                        ret.right = extra_ret.right
-                    } else {
-                        return nil
-                    }
-                } else {
-                    return nil
-                }
-            }
-
-            vars.merge( super_vars ){ (old,new) in new }
-            vars.merge( extra_vars ){ (old,new) in new }
-
-            return ret
-        }
-
-        return nil
-    }
-    
-    
     public override func debug_info ( _ spaces: Int = 0, _ prefix: String = "" ) {
         super.debug_info( spaces, prefix )
         
@@ -298,7 +274,18 @@ public class Endpoint
             print( "".padding(toLength: spaces + 2, withPad: " ", startingAt: 0) + "-> " + str) // + "\(String(format: "%p", address))")
         }
     }
- 
  */
+}
+
+public final class SystemEndpoint
+{
+    private let endpoint: Endpoint
+    init(endpoint: Endpoint) { self.endpoint = endpoint }
+
+    @discardableResult
+    public func get<T>(_ cb: @escaping SyncEndpointRequestDispatcher<T>) -> SystemEndpoint {
+        endpoint.methods[.GET] = MethodEndpoint(systemCb: cb)
+        return self
+    }
 }
 

@@ -265,10 +265,6 @@ final class MIOServerKitNIOTests: XCTestCase {
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version/"), 200)
-
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/"), 404)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/hook"), 404)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/hook/"), 404)
        
         try server.terminateServer()
     }

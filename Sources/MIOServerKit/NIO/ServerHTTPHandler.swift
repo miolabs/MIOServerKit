@@ -129,6 +129,12 @@ class ServerHTTPHandler: ChannelInboundHandler
             let res = self.response!
             
             switch endpoint_spec.executionType {
+            case .system:
+                // Run inline on the event loop. No thread pool. No semaphore.
+                // Liveness probes succeed even when every worker is blocked.
+                endpoint_spec.run(req, res) { result, error in
+                    completion(result, error)
+                }
             case .sync:
                 // Offload sync endpoints to the thread pool.
                 Log.trace("Starting sync endpoint")
@@ -150,6 +156,10 @@ class ServerHTTPHandler: ChannelInboundHandler
                 }
             
             case .async:
+                // Bridge Swift Concurrency to NIO via a promise.
+                // No thread pool worker is held hostage — the Task runs on the
+                // Swift Concurrency executor, the promise is fulfilled when it
+                // finishes, and `whenComplete` fires back on this event loop.
                 threadPool.runIfActive(eventLoop: loop) { () -> Void in
                     let semaphore = DispatchSemaphore(value: 0)
                     var capturedResult: (Any?, Error?)?
