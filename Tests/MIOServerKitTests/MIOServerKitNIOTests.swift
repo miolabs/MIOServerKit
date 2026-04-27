@@ -29,6 +29,7 @@ extension MIOServerKitNIOTests {
 }
 #endif
 
+@Sendable
 fileprivate func httpRootFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         //"status": "success"
@@ -37,6 +38,7 @@ fileprivate func httpRootFuncHandler ( context: RouterContext ) throws -> [Strin
     return response
 }
 
+@Sendable
 fileprivate func httpFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         //"status": "success"
@@ -45,6 +47,7 @@ fileprivate func httpFuncHandler ( context: RouterContext ) throws -> [String:An
     return response
 }
 
+@Sendable
 fileprivate func httpFuncHandlerStr2 ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         //"status": "success"
@@ -374,7 +377,7 @@ final class MIOServerKitNIOTests: XCTestCase {
             "/": ["/", "/version"],
             "/ringr": ["/ready", "/bookings/business-info", "/bookings/update"],
         ]
-        let (server, router) = launchServerHttp(urls)
+        let (server, _) = launchServerHttp(urls)
         
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080", "I'm Root"), 200)
         XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/", "I'm Root"), 200)

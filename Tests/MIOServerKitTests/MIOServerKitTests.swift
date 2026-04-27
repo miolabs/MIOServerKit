@@ -1,6 +1,7 @@
 import XCTest
 @testable import MIOServerKit
 
+@Sendable
 func nop ( _ ctx: any Sendable ) { }
 
 final class MIOServerKitTests: XCTestCase {
@@ -77,7 +78,7 @@ final class MIOServerKitTests: XCTestCase {
     
     func testEndpoint() {
         let router = Router()
-        let route_1 = router.endpoint( "/entity/Product" ).get( nop )
+        _ = router.endpoint( "/entity/Product" ).get( nop )
         let route_2 = router.endpoint( "/entity/ProductPlace" ).get( nop )
         
         var route_vars: RouterPathVars = [:]
@@ -126,8 +127,8 @@ final class MIOServerKitTests: XCTestCase {
         let router = Router()
         let asUUID = "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
         
-        let route_1 = router.endpoint( "/entity/:name\(asUUID)" ).get( nop )
-        let route_2 = router.endpoint( "/entity/:generic-name"  ).get( nop )
+        _ = router.endpoint( "/entity/:name\(asUUID)" ).get( nop )
+        _ = router.endpoint( "/entity/:generic-name"  ).get( nop )
         var route_vars: RouterPathVars = [:]
         
         XCTAssertTrue( router.root.match( RouterPath( "/entity/48D3C8B3-72AA-4441-BA47-769E03A11576" ), &route_vars ) != nil )

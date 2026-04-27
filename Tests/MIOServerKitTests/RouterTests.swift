@@ -1,6 +1,7 @@
 import XCTest
 @testable import MIOServerKit
 
+@Sendable
 fileprivate func httpFuncHandler ( context: RouterContext ) throws -> [String:Any] {
     let response:[String:Any] = [
         "status": "success"

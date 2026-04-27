@@ -49,6 +49,7 @@ extension MIOServerKitStressTests {
 // MARK: - Endpoint handlers
 
 /// Returns immediately. Stresses dispatch path without holding a worker.
+@Sendable
 fileprivate func stressFastHandler( context: RouterContext ) throws -> [String:Any] {
     return [ "ok": true ]
 }
@@ -56,6 +57,8 @@ fileprivate func stressFastHandler( context: RouterContext ) throws -> [String:A
 /// Configurable blocking sleep on a thread-pool worker. Lets us force
 /// backpressure on the pool by combining with high concurrency.
 fileprivate let stressSlowSleepMicros: UInt32 = 50_000   // 50 ms
+
+@Sendable
 fileprivate func stressSlowHandler( context: RouterContext ) throws -> [String:Any] {
     usleep( stressSlowSleepMicros )
     return [ "ok": true ]
@@ -122,6 +125,7 @@ fileprivate func stuckAsyncHandler( context: RouterContext ) async throws -> Any
 fileprivate let stuckSyncSemaphore = DispatchSemaphore( value: 0 )
 
 /// Sync handler that blocks its NIOThreadPool worker until released.
+@Sendable
 fileprivate func stuckSyncHandler( context: RouterContext ) throws -> [String:Any] {
     stuckSyncSemaphore.wait()
     return [ "released": true ]
@@ -129,6 +133,7 @@ fileprivate func stuckSyncHandler( context: RouterContext ) throws -> [String:An
 
 /// System endpoint handler. Runs inline on the EventLoop — must NEVER block
 /// or do I/O.
+@Sendable
 fileprivate func stressSystemHealthHandler( context: RouterContext ) throws -> String {
     return "OK"
 }
