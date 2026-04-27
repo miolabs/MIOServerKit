@@ -10,7 +10,10 @@ import Foundation
 import NIOHTTP1
 import MIOCore
 
-open class RouterResponse
+// Single-threaded by construction: created in channelRead, captured into
+// exactly one of {.system, .sync via runIfActive, .async via Task} and
+// never shared. Do not store or pass to multiple consumers concurrently.
+open class RouterResponse : @unchecked Sendable
 {
     public var status:HTTPResponseStatus = .ok
     public var headers:HTTPHeaders = HTTPHeaders()

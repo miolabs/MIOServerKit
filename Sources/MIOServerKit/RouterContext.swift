@@ -89,7 +89,10 @@ extension RouterContextProtocol
     
 }
 
-open class RouterContext : MIOCoreContext, RouterContextProtocol
+// Single-threaded by construction: created in channelRead, captured into
+// exactly one of {.system, .sync via runIfActive, .async via Task} and
+// never shared. Do not store or pass to multiple consumers concurrently.
+open class RouterContext : MIOCoreContext, RouterContextProtocol, @unchecked Sendable
 {
     public var request: RouterRequest
     public var response: RouterResponse

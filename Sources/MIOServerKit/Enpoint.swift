@@ -66,88 +66,101 @@ public class EndpointPath
 public typealias SyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) throws -> (any Sendable)?
 public typealias AsyncEndpointRequestDispatcher<T:RouterContext> = @Sendable ( _ context: T ) async throws -> (any Sendable)?
 
+/// Result of running an endpoint handler. Success carries the handler's return
+/// value; failure carries any error thrown by the handler or its lifecycle hooks
+/// (`willExecute` / `didExecute` / `responseBodyData`).
+public typealias MethodEndpointResult = Result<(any Sendable)?, Error>
+
+/// Completion-style callback used at the boundary between `dispatch_request`
+/// and `channelRead`. Internal to the NIO handler — not part of the endpoint
+/// authoring API.
 public typealias MethodEndpointCompletionBlock = ( (any Sendable)?, Error? ) -> Void
 
-protocol MethodEndpointExecutionProtocol {
-    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )
-    func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async
+protocol MethodEndpointExecutionProtocol : Sendable {
+    /// Runs synchronously on the calling thread. Used by `.system` (event loop)
+    /// and `.sync` (thread pool) execution paths.
+    /// Errors are returned via `Result.failure` so callers can compose with
+    /// `EventLoopFuture` without juggling completion handlers.
+    func runSync( _ request: RouterRequest, _ response: RouterResponse ) -> MethodEndpointResult
+
+    /// Runs asynchronously inside a `Task`. Used by the `.async` execution path.
+    /// The returned `Result` is later used to fulfill an `EventLoopPromise`.
+    func runAsync( _ request: RouterRequest, _ response: RouterResponse ) async -> MethodEndpointResult
 }
 
 public struct MethodEndpoint
 {
     // Wrapper for sync callbacks
-    struct SyncEndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
+    struct SyncEndpointWrapper<T : Sendable & RouterContext > : MethodEndpointExecutionProtocol
     {
         let cb: SyncEndpointRequestDispatcher<T>
-        
+
         init ( _ cb: @escaping SyncEndpointRequestDispatcher<T> ) {
             self.cb = cb
         }
-        
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async {
-            completion( nil, MIOCoreError.general( "Async endpoints are not supported in synchronous mode" ) )
+
+        func runAsync( _ request: RouterRequest, _ response: RouterResponse ) async -> MethodEndpointResult {
+            return .failure( MIOCoreError.general( "Sync endpoint invoked via async path" ) )
         }
-        
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: MethodEndpointCompletionBlock )
-        {
+
+        func runSync( _ request: RouterRequest, _ response: RouterResponse ) -> MethodEndpointResult {
             do {
                 let ctx = try T.init( request, response )
                 try ctx.willExecute()
                 var result: Any? = try cb( ctx )
                 try ctx.didExecute()
-                
-                // Add Custome headers if available
+
+                // Add custom headers if available
                 for (k,v) in ctx.responseHeaders() {
                     response.headers.replaceOrAdd( name: k, value: v )
                 }
-                
+
                 result = try ctx.responseBodyData( result )
-                
-                completion( result, nil )
-                Log.debug( "Syncrhonous endpoint executed successfully." )
+
+                Log.debug( "Synchronous endpoint executed successfully." )
+                return .success( result )
             }
             catch {
                 Log.error( "\(error)" )
-                completion( nil, error )
+                return .failure( error )
             }
         }
     }
         
     // Wrapper for async callbacks
-    struct AsyncEndpointWrapper<T : RouterContext > : MethodEndpointExecutionProtocol
+    struct AsyncEndpointWrapper<T : Sendable & RouterContext > : MethodEndpointExecutionProtocol
     {
         let cb: AsyncEndpointRequestDispatcher<T>
-        
+
         init ( _ cb: @escaping AsyncEndpointRequestDispatcher<T> ) {
             self.cb = cb
         }
-        
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
-            completion( nil, MIOCoreError.general( "Sync endpoints are not supported in asynchronous mode" ) )
+
+        func runSync( _ request: RouterRequest, _ response: RouterResponse ) -> MethodEndpointResult {
+            return .failure( MIOCoreError.general( "Async endpoint invoked via sync path" ) )
         }
-        
-        func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) async
-        {
+
+        func runAsync( _ request: RouterRequest, _ response: RouterResponse ) async -> MethodEndpointResult {
             do {
                 let ctx = try T.init( request, response )
-                
+
                 try await ctx.willExecute()
-                var result:Any? = try await cb( ctx )
+                var result: Any? = try await cb( ctx )
                 try await ctx.didExecute()
-                
-                // Add Custome headers if available
+
+                // Add custom headers if available
                 for (k,v) in ctx.responseHeaders() {
                     response.headers.replaceOrAdd( name: k, value: v )
                 }
-                
+
                 result = try ctx.responseBodyData( result )
-                
-                completion( result, nil )
-                Log.debug( "Asyncrhonous endpoint executed successfully." )
+
+                Log.debug( "Asynchronous endpoint executed successfully." )
+                return .success( result )
             }
             catch {
                 Log.error( "\(error)" )
-                completion( nil, error )
+                return .failure( error )
             }
         }
     }
@@ -184,12 +197,12 @@ public struct MethodEndpoint
         _execution_type = .async
     }
 
-    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock ) {
-        wrapper.run( request, response, completion )
+    public func runSync( _ request: RouterRequest, _ response: RouterResponse ) -> MethodEndpointResult {
+        return wrapper.runSync( request, response )
     }
-    
-    public func run( _ request:RouterRequest, _ response:RouterResponse, _ completion: @escaping MethodEndpointCompletionBlock )  async {
-        await wrapper.run( request, response, completion )
+
+    public func runAsync( _ request: RouterRequest, _ response: RouterResponse ) async -> MethodEndpointResult {
+        return await wrapper.runAsync( request, response )
     }
 }
 

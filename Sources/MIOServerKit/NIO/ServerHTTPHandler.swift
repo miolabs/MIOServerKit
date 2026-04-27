@@ -124,62 +124,61 @@ class ServerHTTPHandler: ChannelInboundHandler
             request.parameters = route_vars
             let loop = context.eventLoop
             let endpoint_spec = endpoint!.methods[ method ]!
-            
+
             let req = self.request!
             let res = self.response!
-            
+
+            // Each execution path produces an EventLoopFuture<MethodEndpointResult>.
+            // After this switch, a single `whenComplete` translates the result into
+            // the dispatcher's completion callback. No manual loop.execute is
+            // needed anywhere — future callbacks fire on the loop the future was
+            // created on (or hopped to via runIfActive's eventLoop arg).
+            let future: EventLoopFuture<MethodEndpointResult>
+
             switch endpoint_spec.executionType {
             case .system:
-                // Run inline on the event loop. No thread pool. No semaphore.
-                // Liveness probes succeed even when every worker is blocked.
-                endpoint_spec.run(req, res) { result, error in
-                    completion(result, error)
-                }
+                // Inline on the event loop. No thread pool, no Task. The handler
+                // MUST be non-blocking — misuse will stall the entire EventLoopGroup.
+                Log.trace("Starting system endpoint")
+                let result = endpoint_spec.runSync(req, res)
+                future = loop.makeSucceededFuture(result)
+
             case .sync:
-                // Offload sync endpoints to the thread pool.
+                // Offload to the thread pool. runIfActive returns a future that
+                // fails if the pool is shutting down (covered by the outer .failure
+                // branch in whenComplete below).
                 Log.trace("Starting sync endpoint")
-                threadPool.runIfActive(eventLoop: loop) { () -> Void in
+                future = threadPool.runIfActive(eventLoop: loop) {
                     Log.trace("Thread pool work starting")
-                    endpoint_spec.run(req, res) { result, error in
-                        Log.trace("Endpoint completed")
-                        // Always hop back to the channel's event loop before touching NIO.
-                        loop.execute {
-                            completion(result, error)
-                        }
-                    }
+                    return endpoint_spec.runSync(req, res)
                 }
-                .whenFailure { error in
-                    Log.trace("Endpoint fail")
-                    loop.execute {
-                        completion(nil, error)
-                    }
-                }
-                
+
             case .async:
-                // Bridge Swift Concurrency to NIO via a promise.
-                // No thread pool worker is held hostage — the Task runs on the
-                // Swift Concurrency executor, the promise is fulfilled when it
-                // finishes, and `whenComplete` fires back on this event loop.
-                let promise = loop.makePromise(of: (any Sendable)?.self)
-                
+                // Bridge Swift Concurrency to NIO via a promise. The Task runs on
+                // the cooperative executor; no NIOThreadPool worker is held hostage.
+                Log.trace("Starting async endpoint")
+                let promise = loop.makePromise(of: MethodEndpointResult.self)
                 Task {
-                    Log.trace("Starting async endpoint")
-                    await endpoint_spec.run(req, res) { result, error in
-                        if let error = error {
-                            promise.fail(error)
-                        } else {
-                            promise.succeed(result)
-                        }
-                    }
+                    let result = await endpoint_spec.runAsync(req, res)
+                    promise.succeed(result)
                 }
-                
-                promise.futureResult.whenComplete { outcome in
-                    // Already on the event loop — no manual loop.execute needed.
+                future = promise.futureResult
+            }
+
+            future.whenComplete { outcome in
+                // Always on the event loop. Outer Result is NIO infrastructure
+                // (e.g. thread pool shut down); inner Result is the handler's own
+                // success/failure. Both terminate in `completion(_:_:)`.
+                switch outcome {
+                case .success(.success(let value)):
                     Log.trace("Endpoint completed")
-                    switch outcome {
-                    case .success(let value): completion(value, nil)
-                    case .failure(let error): completion(nil, error); Log.trace("Endpoint fail")
-                    }
+                    completion(value, nil)
+                case .success(.failure(let error)):
+                    Log.trace("Endpoint failed")
+                    completion(nil, error)
+                case .failure(let error):
+                    Log.trace("Endpoint dispatch failed: \(error)")
+                    completion(nil, error)
                 }
             }
         }
