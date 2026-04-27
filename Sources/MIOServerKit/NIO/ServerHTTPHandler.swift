@@ -154,34 +154,31 @@ class ServerHTTPHandler: ChannelInboundHandler
                         completion(nil, error)
                     }
                 }
-            
+                
             case .async:
                 // Bridge Swift Concurrency to NIO via a promise.
                 // No thread pool worker is held hostage — the Task runs on the
                 // Swift Concurrency executor, the promise is fulfilled when it
                 // finishes, and `whenComplete` fires back on this event loop.
-                threadPool.runIfActive(eventLoop: loop) { () -> Void in
-                    let semaphore = DispatchSemaphore(value: 0)
-                    var capturedResult: (Any?, Error?)?
-                    
-                    Task {
-                        await endpoint_spec.run(req, res) { result, error in
-                            capturedResult = (result, error)
-                            semaphore.signal()
-                        }
-                    }
-                    
-                    semaphore.wait()
-                    
-                    if let (result, error) = capturedResult {
-                        loop.execute {
-                            completion(result, error)
+                let promise = loop.makePromise(of: (any Sendable)?.self)
+                
+                Task {
+                    Log.trace("Starting async endpoint")
+                    await endpoint_spec.run(req, res) { result, error in
+                        if let error = error {
+                            promise.fail(error)
+                        } else {
+                            promise.succeed(result)
                         }
                     }
                 }
-                .whenFailure { error in
-                    loop.execute {
-                        completion(nil, error)
+                
+                promise.futureResult.whenComplete { outcome in
+                    // Already on the event loop — no manual loop.execute needed.
+                    Log.trace("Endpoint completed")
+                    switch outcome {
+                    case .success(let value): completion(value, nil)
+                    case .failure(let error): completion(nil, error); Log.trace("Endpoint fail")
                     }
                 }
             }
