@@ -159,7 +159,17 @@ class ServerHTTPHandler: ChannelInboundHandler
                 Log.trace("Starting async endpoint")
                 let promise = loop.makePromise(of: MethodEndpointResult.self)
                 Task {
+                    #if DEBUG
+                    // Stamp a task-local owner token so RouterContext.assertOwner()
+                    // can detect cross-Task / cross-queue misuse. The token is
+                    // unique per request, captured by the context at construction
+                    // (inside runAsync), and inherited by structured children.
+                    let result = await RouterContext.$currentOwnerToken.withValue(UUID()) {
+                        await endpoint_spec.runAsync(req, res)
+                    }
+                    #else
                     let result = await endpoint_spec.runAsync(req, res)
+                    #endif
                     promise.succeed(result)
                 }
                 future = promise.futureResult
