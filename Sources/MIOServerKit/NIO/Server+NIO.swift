@@ -22,6 +22,15 @@ open class NIOServer: Server
     var bootstrap: ServerBootstrap!
     var channel: Channel!
         
+    // Pool occupancy tracking. Updated at sync-handler dispatch boundaries
+    // in ServerHTTPHandler. Single shared instance across all connections so
+    // /health can report server-wide pool state, not per-connection state.
+    private let poolStatsLock = NSLock()
+    private var _poolActive: Int = 0
+    private var _poolPeak: Int = 0
+    private var _poolTotalDispatched: Int = 0
+
+    
     public override init(routes: Router)
     {
         // Thread pool is usually tied to IO bound. Can be create more threads. Between 16 or 32 is a good balance
@@ -86,7 +95,7 @@ open class NIOServer: Server
     
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
-            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, threadPool: self.threadPool ) )
+            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, threadPool: self.threadPool, server: self ) )
         }
     }
     
@@ -126,4 +135,51 @@ open class NIOServer: Server
             Log.error("Error terminating server: \(error)")
         }
     }
+}
+
+// Thread pool debug
+
+extension NIOServer
+{
+        /// Increments the active-worker count. Call at the start of any dispatch
+        /// path that occupies a NIOThreadPool worker (currently: .sync handlers).
+        /// Returns the new active count for logging convenience.
+        @discardableResult
+        func poolStats_enter() -> Int {
+            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+            _poolActive += 1
+            _poolTotalDispatched += 1
+            if _poolActive > _poolPeak { _poolPeak = _poolActive }
+            return _poolActive
+        }
+
+        /// Decrements the active-worker count. Must be paired with every
+        /// poolStats_enter() call, including on error paths.
+        func poolStats_exit() {
+            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+            _poolActive -= 1
+        }
+
+        /// Snapshot of current pool state. Safe to call from any thread.
+        public struct PoolStats {
+            public let active: Int           // workers running handler code right now
+            public let peak: Int             // high-water mark since last reset
+            public let totalDispatched: Int  // monotonic count of all dispatches ever
+            public let configured: Int       // pool size from config
+        }
+
+        public func poolStats() -> PoolStats {
+            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+            return PoolStats(active: _poolActive,
+                             peak: _poolPeak,
+                             totalDispatched: _poolTotalDispatched,
+                             configured: threadPool.numberOfThreads)
+        }
+
+        /// Resets the peak counter. Useful for periodic monitoring where you want
+        /// to see "peak in the last N seconds" rather than peak-since-startup.
+        public func poolStats_resetPeak() {
+            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+            _poolPeak = _poolActive   // reset to current active, not 0
+        }
 }

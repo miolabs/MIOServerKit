@@ -59,10 +59,12 @@ class ServerHTTPHandler: ChannelInboundHandler
         
     private let router: Router
     private let threadPool: NIOThreadPool
+    private weak var server: NIOServer?   // weak to avoid retain cycle
 
-    public init(router: Router, threadPool: NIOThreadPool) {
+    public init(router: Router, threadPool: NIOThreadPool, server: NIOServer? = nil) {
         self.router = router
         self.threadPool = threadPool
+        self.server = server
     }
     
     deinit {
@@ -149,7 +151,12 @@ class ServerHTTPHandler: ChannelInboundHandler
                 // branch in whenComplete below).
                 Log.trace("Starting sync endpoint")
                 future = threadPool.runIfActive(eventLoop: loop) {
-                    Log.trace("Thread pool work starting")
+                    Log.trace("Thread pool work start")
+                    self.server?.poolStats_enter()
+                    defer {
+                        Log.trace("Thread pool work end")
+                        self.server?.poolStats_exit()
+                    }
                     return endpoint_spec.runSync(req, res)
                 }
 
