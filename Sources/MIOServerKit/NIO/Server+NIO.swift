@@ -29,6 +29,7 @@ open class NIOServer: Server
     private var _poolActive: Int = 0
     private var _poolPeak: Int = 0
     private var _poolTotalDispatched: Int = 0
+    private var _activeRequests: [UUID: (url: String, started: Date)] = [:]
 
     
     public override init(routes: Router)
@@ -141,45 +142,78 @@ open class NIOServer: Server
 
 extension NIOServer
 {
-        /// Increments the active-worker count. Call at the start of any dispatch
-        /// path that occupies a NIOThreadPool worker (currently: .sync handlers).
-        /// Returns the new active count for logging convenience.
-        @discardableResult
-        func poolStats_enter() -> Int {
-            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-            _poolActive += 1
-            _poolTotalDispatched += 1
-            if _poolActive > _poolPeak { _poolPeak = _poolActive }
-            return _poolActive
-        }
+    /// Increments the active-worker count. Call at the start of any dispatch
+    /// path that occupies a NIOThreadPool worker (currently: .sync handlers).
+    /// Returns the new active count for logging convenience.
+    @discardableResult
+    func poolStats_enter() -> Int {
+        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+        _poolActive += 1
+        _poolTotalDispatched += 1
+        if _poolActive > _poolPeak { _poolPeak = _poolActive }
+        return _poolActive
+    }
 
-        /// Decrements the active-worker count. Must be paired with every
-        /// poolStats_enter() call, including on error paths.
-        func poolStats_exit() {
-            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-            _poolActive -= 1
-        }
+    /// Decrements the active-worker count. Must be paired with every
+    /// poolStats_enter() call, including on error paths.
+    func poolStats_exit() {
+        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+        _poolActive -= 1
+    }
 
-        /// Snapshot of current pool state. Safe to call from any thread.
-        public struct PoolStats {
-            public let active: Int           // workers running handler code right now
-            public let peak: Int             // high-water mark since last reset
-            public let totalDispatched: Int  // monotonic count of all dispatches ever
-            public let configured: Int       // pool size from config
-        }
+    /// Snapshot of current pool state. Safe to call from any thread.
+    public struct PoolStats {
+        public let active: Int           // workers running handler code right now
+        public let peak: Int             // high-water mark since last reset
+        public let totalDispatched: Int  // monotonic count of all dispatches ever
+        public let configured: Int       // pool size from config
+    }
 
-        public func poolStats() -> PoolStats {
-            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-            return PoolStats(active: _poolActive,
-                             peak: _poolPeak,
-                             totalDispatched: _poolTotalDispatched,
-                             configured: threadPool.numberOfThreads)
-        }
+    public func poolStats() -> PoolStats {
+        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+        return PoolStats(active: _poolActive,
+                         peak: _poolPeak,
+                         totalDispatched: _poolTotalDispatched,
+                         configured: threadPool.numberOfThreads)
+    }
 
-        /// Resets the peak counter. Useful for periodic monitoring where you want
-        /// to see "peak in the last N seconds" rather than peak-since-startup.
-        public func poolStats_resetPeak() {
-            poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-            _poolPeak = _poolActive   // reset to current active, not 0
-        }
+    /// Resets the peak counter. Useful for periodic monitoring where you want
+    /// to see "peak in the last N seconds" rather than peak-since-startup.
+    public func poolStats_resetPeak() {
+        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
+        _poolPeak = _poolActive   // reset to current active, not 0
+    }
+    
+    func poolStats_enterWithRequest(url: String) -> UUID {
+        let id = UUID()
+        poolStatsLock.lock()
+        _poolActive += 1
+        _poolTotalDispatched += 1
+        if _poolActive > _poolPeak { _poolPeak = _poolActive }
+        _activeRequests[id] = (url: url, started: Date())
+        poolStatsLock.unlock()
+        return id
+    }
+
+    func poolStats_exitWithRequest(_ id: UUID) {
+        poolStatsLock.lock()
+        _poolActive -= 1
+        _activeRequests.removeValue(forKey: id)
+        poolStatsLock.unlock()
+    }
+    
+    public struct ActiveRequest {
+        public let url: String
+        public let ageSeconds: Double
+    }
+
+    public func poolStats_inFlight() -> [ActiveRequest] {
+        poolStatsLock.lock()
+        defer { poolStatsLock.unlock() }
+        let now = Date()
+        return _activeRequests.values
+            .map { ActiveRequest( url: $0.url
+                                , ageSeconds: now.timeIntervalSince($0.started) ) }
+            .sorted { $0.ageSeconds > $1.ageSeconds }
+    }
 }

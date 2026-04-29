@@ -150,12 +150,18 @@ class ServerHTTPHandler: ChannelInboundHandler
                 // fails if the pool is shutting down (covered by the outer .failure
                 // branch in whenComplete below).
                 Log.trace("Starting sync endpoint")
+                let requestPath = path   // captured by value into the closure for in-flight tracking
                 future = threadPool.runIfActive(eventLoop: loop) {
                     Log.trace("Thread pool work start")
-                    self.server?.poolStats_enter()
+                    // enterWithRequest registers this dispatch in _activeRequests so
+                    // /health can list it by URL and age. Returns nil if `server` was
+                    // released (shouldn't happen during normal operation).
+                    let requestID = self.server?.poolStats_enterWithRequest(url: requestPath)
                     defer {
                         Log.trace("Thread pool work end")
-                        self.server?.poolStats_exit()
+                        if let id = requestID {
+                            self.server?.poolStats_exitWithRequest(id)
+                        }
                     }
                     return endpoint_spec.runSync(req, res)
                 }
