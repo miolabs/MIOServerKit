@@ -105,6 +105,7 @@ public struct MethodEndpoint
 
         func runSync( _ request: RouterRequest, _ response: RouterResponse ) -> MethodEndpointResult {
             do {
+                Log.debug( "Synchronous endpoint will start executing." )
                 let ctx = try T.init( request, response )
                 try ctx.willExecute()
                 var result: Any? = try cb( ctx )
@@ -117,11 +118,11 @@ public struct MethodEndpoint
 
                 result = try ctx.responseBodyData( result )
 
-                Log.debug( "Synchronous endpoint executed successfully." )
+                Log.debug( "Synchronous endpoint did end executed successfully." )
                 return .success( result )
             }
             catch {
-                Log.error( "\(error)" )
+                Log.error( "Synchronous endpoint error: \(error)" )
                 return .failure( error )
             }
         }
@@ -142,6 +143,7 @@ public struct MethodEndpoint
 
         func runAsync( _ request: RouterRequest, _ response: RouterResponse ) async -> MethodEndpointResult {
             do {
+                Log.debug( "Asynchronous endpoint will start executing." )
                 let ctx = try T.init( request, response )
 
                 try await ctx.willExecute()
@@ -159,7 +161,7 @@ public struct MethodEndpoint
                 return .success( result )
             }
             catch {
-                Log.error( "\(error)" )
+                Log.error( "Asynchronous endpoint error: \(error)" )
                 return .failure( error )
             }
         }
