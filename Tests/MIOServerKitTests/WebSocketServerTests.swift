@@ -203,8 +203,9 @@ final class WebSocketServerTests: XCTestCase
 
     func test_ClientSendsString () async throws {
         let received = expectation( description: "OnText fires with client message" )
-        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { (message: String, _) in
-            XCTAssertEqual( message, "Hello server" )
+        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { message, _ in
+            guard let text = message.text() else { XCTFail( "expected text frame" ); return }
+            XCTAssertEqual( text, "Hello server" )
             received.fulfill()
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
@@ -244,8 +245,9 @@ final class WebSocketServerTests: XCTestCase
         let clientMessage = "Hello server"
         let serverAnswer = "Hello client, I'm the server"
 
-        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { (message: String, ops) in
-            XCTAssertEqual( message, clientMessage )
+        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { message, ops in
+            guard let text = message.text() else { XCTFail( "expected text frame" ); return }
+            XCTAssertEqual( text, clientMessage )
             try await ops.sendMessageToCaller( serverAnswer )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
@@ -264,8 +266,9 @@ final class WebSocketServerTests: XCTestCase
         let clientAnswer = "Hello server, I'm the client"
 
         let received = expectation( description: "OnText fires with client reply" )
-        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { (message: String, _) in
-            XCTAssertEqual( message, clientAnswer )
+        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { message, _ in
+            guard let text = message.text() else { XCTFail( "expected text frame" ); return }
+            XCTAssertEqual( text, clientAnswer )
             received.fulfill()
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
@@ -285,8 +288,9 @@ final class WebSocketServerTests: XCTestCase
 
     func test_BroadcastSkipsCaller () async throws {
         let clientMessage = "I changed something"
-        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { (message: String, ops) in
-            XCTAssertEqual( message, clientMessage )
+        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { message, ops in
+            guard let text = message.text() else { XCTFail( "expected text frame" ); return }
+            XCTAssertEqual( text, clientMessage )
             try await ops.sendMessageToAllButCaller( clientMessage )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
@@ -326,8 +330,9 @@ final class WebSocketServerTests: XCTestCase
         let size = 16 * 1024
         let payload = String( repeating: "U", count: size )
         let received = expectation( description: "OnText fires with full payload" )
-        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { (message: String, _) in
-            XCTAssertEqual( message.count, size )
+        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { message, _ in
+            guard let text = message.text() else { XCTFail( "expected text frame" ); return }
+            XCTAssertEqual( text.count, size )
             received.fulfill()
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
@@ -350,7 +355,7 @@ final class WebSocketServerTests: XCTestCase
         let notReceived = expectation( description: "OnText must NOT fire" )
         notReceived.isInverted = true
 
-        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { (_: String, _) in
+        let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { _, _ in
             notReceived.fulfill()
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )

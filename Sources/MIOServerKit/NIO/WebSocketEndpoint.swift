@@ -9,52 +9,88 @@
 
 import Foundation
 
-/// User-supplied callback for incoming TEXT frames.
-/// `operations` exposes the reply primitives (caller / all / all-but-caller).
-public typealias WebSocketTextDispatcher =
-    @Sendable ( _ text: String, _ operations: ConnectedWebSocketOperations ) async throws -> Void
+// MARK: - ReceivedMessage
 
-/// User-supplied callback for incoming BINARY frames.
+/// A message handed to the user's `onMessageReceived` callback. The
+/// framework populates exactly one underlying payload (text or binary)
+/// based on the inbound frame's opcode; callers query `.text()` /
+/// `.data()` to find out which arrived and to extract the payload.
 ///
-/// Receive-side binary is fully implemented: frames arriving with the
-/// `.binary` opcode are decoded into `Data` and dispatched here. The
-/// send-side counterpart (`sendMessageTo*(_: Data)`) is still a TODO,
-/// so a handler can read binary payloads but cannot reply with one yet.
-public typealias WebSocketBinaryDispatcher =
-    @Sendable ( _ data: Data, _ operations: ConnectedWebSocketOperations ) async throws -> Void
-
-// MARK: - Handler wrappers
-
-/// Stored form of a `WebSocketTextDispatcher`. Wrapping the closure in a
-/// struct keeps the endpoint type a plain value-holder and lets us add
-/// per-handler hooks (logging, metrics) without touching the public
-/// closure signature.
-public struct WebSocketTextHandler: Sendable
+/// Why a single value type with accessors instead of overloaded callbacks
+/// (one per frame type)?
+///
+///   * **Method proliferation.** Each new frame type the framework cares
+///     about (today: text, binary; tomorrow maybe app-level ping/pong)
+///     would otherwise add another `onMessageReceived` overload — the
+///     public surface keeps growing and Swift's overload resolution gets
+///     more fragile every step.
+///   * **Silently missed frames.** A subscriber that registers only a
+///     text handler has no way to know a binary frame arrived. With this
+///     design, every inbound message reaches the same callback; the
+///     caller decides what to do (handle, log, ignore — explicitly).
+///
+/// New frame types are added as new accessors on this struct, never as
+/// new endpoint methods. Old call sites keep working unchanged.
+public struct ReceivedMessage: Sendable
 {
-    private let cb: WebSocketTextDispatcher
-
-    public init ( cb: @escaping WebSocketTextDispatcher ) {
-        self.cb = cb
+    /// Internal storage. Hidden from users so we can add cases later
+    /// (e.g. `.applicationPing(Data)`) without breaking call sites that
+    /// only look at the public accessors.
+    fileprivate enum Kind: Sendable
+    {
+        case text( String )
+        case binary( Data )
     }
 
-    public func run ( _ text: String, _ operations: ConnectedWebSocketOperations ) async throws {
-        try await cb( text, operations )
+    fileprivate let kind: Kind
+
+    fileprivate init ( _ kind: Kind ) {
+        self.kind = kind
     }
+
+    /// The text payload, if this message arrived as a TEXT frame.
+    /// Returns `nil` for any other frame type.
+    public func text () -> String? {
+        if case .text( let s ) = kind { return s }
+        return nil
+    }
+
+    /// The binary payload, if this message arrived as a BINARY frame.
+    /// Returns `nil` for any other frame type.
+    public func data () -> Data? {
+        if case .binary( let d ) = kind { return d }
+        return nil
+    }
+
+    // MARK: Factories — `internal` so user code can't synthesise messages
+    //                   that didn't actually traverse the framework path.
+
+    static func text ( _ s: String ) -> ReceivedMessage { .init( .text( s ) ) }
+    static func binary ( _ d: Data ) -> ReceivedMessage { .init( .binary( d ) ) }
 }
 
-/// Stored form of a `WebSocketBinaryDispatcher`. See note on
-/// `WebSocketBinaryDispatcher` — present but inert until binary receive
-/// dispatch lands in `ConnectedWebSocket.gotFrame`.
-public struct WebSocketBinaryHandler: Sendable
-{
-    private let cb: WebSocketBinaryDispatcher
+// MARK: - Dispatcher / handler
 
-    public init ( cb: @escaping WebSocketBinaryDispatcher ) {
+/// User-supplied callback invoked once per inbound WebSocket message
+/// (text or binary). `operations` exposes the reply primitives
+/// (caller / all / all-but-caller).
+public typealias WebSocketMessageDispatcher =
+    @Sendable ( _ message: ReceivedMessage, _ operations: ConnectedWebSocketOperations ) async throws -> Void
+
+/// Stored form of a `WebSocketMessageDispatcher`. Wrapping the closure in
+/// a struct keeps the endpoint type a plain value-holder and gives us a
+/// place to add per-handler hooks (logging, metrics) later without
+/// changing the public closure signature.
+public struct WebSocketMessageHandler: Sendable
+{
+    private let cb: WebSocketMessageDispatcher
+
+    public init ( cb: @escaping WebSocketMessageDispatcher ) {
         self.cb = cb
     }
 
-    public func run ( _ data: Data, _ operations: ConnectedWebSocketOperations ) async throws {
-        try await cb( data, operations )
+    public func run ( _ message: ReceivedMessage, _ operations: ConnectedWebSocketOperations ) async throws {
+        try await cb( message, operations )
     }
 }
 
@@ -62,27 +98,19 @@ public struct WebSocketBinaryHandler: Sendable
 
 /// Declares a WebSocket endpoint at a given URI (e.g. "/socket").
 ///
-/// Usage — text handler (works today):
+/// Usage:
 /// ```swift
 /// let chat = WebSocketEndpoint( "/chat" )
-///     .onMessageReceived { (text: String, ops) in
-///         try await ops.sendMessageToAllButCaller( text )
+///     .onMessageReceived { message, ops in
+///         if let text = message.text() {
+///             try await ops.sendMessageToAllButCaller( text )
+///         } else if let data = message.data() {
+///             // binary receive works today; binary send is TODO
+///             _ = data
+///         }
 ///     }
 /// let server = NIOServer( routes: router, webSocketEndpoints: [ chat ] )
 /// ```
-///
-/// Usage — binary handler (declared, dispatch TODO):
-/// ```swift
-/// chat.onMessageReceived { (data: Data, ops) in
-///     // handle binary payload
-/// }
-/// ```
-///
-/// The two overloads of `onMessageReceived` differ only in the closure's
-/// first parameter type (`String` vs `Data`). Swift's overload resolution
-/// can usually pick the right one from context, but if your closure body
-/// doesn't make the type obvious, annotate the parameter explicitly
-/// (as in the examples above) to keep diagnostics readable.
 ///
 /// Endpoints are passed to `NIOServer` at construction time and registered
 /// in a `ConnectedWebSocketCatalog`. The framework consults the catalog in
@@ -91,31 +119,20 @@ public final class WebSocketEndpoint: @unchecked Sendable
 {
     public let uri: String
 
-    /// Handler invoked for every TEXT frame received on this endpoint.
-    /// `nil` if no `onMessageReceived(String, …)` overload was registered.
-    public internal( set ) var textHandler: WebSocketTextHandler?
-
-    /// Handler invoked for every BINARY frame received on this endpoint.
-    /// `nil` if no `onMessageReceived(Data, …)` overload was registered.
-    public internal( set ) var binaryHandler: WebSocketBinaryHandler?
+    /// Single inbound-message callback. `nil` if `onMessageReceived` was
+    /// never registered, in which case incoming frames are dropped with
+    /// a debug log.
+    public internal( set ) var handler: WebSocketMessageHandler?
 
     public init ( _ uri: String ) {
         self.uri = uri
     }
 
-    /// Register a handler for incoming TEXT frames. Returns self so calls
-    /// chain in the same style as the HTTP endpoint DSL.
+    /// Register the inbound-message handler. Returns self so calls chain
+    /// in the same style as the HTTP endpoint DSL.
     @discardableResult
-    public func onMessageReceived ( _ cb: @escaping WebSocketTextDispatcher ) -> WebSocketEndpoint {
-        textHandler = WebSocketTextHandler( cb: cb )
-        return self
-    }
-
-    /// Register a handler for incoming BINARY frames. Returns self so
-    /// calls chain in the same style as the text overload.
-    @discardableResult
-    public func onMessageReceived ( _ cb: @escaping WebSocketBinaryDispatcher ) -> WebSocketEndpoint {
-        binaryHandler = WebSocketBinaryHandler( cb: cb )
+    public func onMessageReceived ( _ cb: @escaping WebSocketMessageDispatcher ) -> WebSocketEndpoint {
+        handler = WebSocketMessageHandler( cb: cb )
         return self
     }
 }

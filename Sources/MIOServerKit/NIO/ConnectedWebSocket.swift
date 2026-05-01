@@ -56,39 +56,24 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
         return ( false, false )
     }
 
-    /// Default TEXT-frame entry point. Looks up the endpoint's registered
-    /// text handler and runs it. Errors are logged, never silently
-    /// swallowed — silent catch was a debugging hazard on the legacy branch.
-    /// Subclasses can override either this overload or the binary one
-    /// below independently.
-    open func onMessageReceivedFromClient ( _ text: String ) async {
+    /// Default inbound-message entry point. Looks up the endpoint's
+    /// single `onMessageReceived` handler and runs it with a populated
+    /// `ReceivedMessage`. Errors are logged, never silently swallowed —
+    /// silent catch was a debugging hazard on the legacy branch.
+    ///
+    /// Subclasses override this once for all frame types; switch on
+    /// `message.text()` / `message.data()` inside if behaviour needs to
+    /// differ per type.
+    open func onMessageReceivedFromClient ( _ message: ReceivedMessage ) async {
         let endPoint = allConnections.endPoint
-        guard let handler = endPoint.textHandler else {
-            Log.debug( "WebSocket text frame on \(endPoint.uri) but no text handler registered" )
+        guard let handler = endPoint.handler else {
+            Log.debug( "WebSocket message on \(endPoint.uri) but no handler registered" )
             return
         }
         do {
-            try await handler.run( text, self )
+            try await handler.run( message, self )
         } catch {
-            Log.error( "WebSocket text handler failed on \(endPoint.uri) for client \(id): \(error)" )
-        }
-    }
-
-    /// Default BINARY-frame entry point. Symmetric with the text overload:
-    /// looks up the endpoint's binary handler and runs it. Receive-side
-    /// binary is fully wired (no encoding needed — frames arrive as raw
-    /// bytes); send-side is still a TODO (see the `Data` overloads of
-    /// `sendMessageTo*` further down).
-    open func onMessageReceivedFromClient ( _ data: Data ) async {
-        let endPoint = allConnections.endPoint
-        guard let handler = endPoint.binaryHandler else {
-            Log.debug( "WebSocket binary frame on \(endPoint.uri) but no binary handler registered" )
-            return
-        }
-        do {
-            try await handler.run( data, self )
-        } catch {
-            Log.error( "WebSocket binary handler failed on \(endPoint.uri) for client \(id): \(error)" )
+            Log.error( "WebSocket handler failed on \(endPoint.uri) for client \(id): \(error)" )
         }
     }
 
@@ -207,7 +192,7 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
                 // real client starts fragmenting.
                 Log.warning( "WebSocket received fragmented TEXT frame on \(allConnections.endPoint.uri); reassembly not implemented" )
             }
-            await onMessageReceivedFromClient( text )
+            await onMessageReceivedFromClient( .text( text ) )
 
         case .ping:
             var data = frame.data
@@ -242,7 +227,7 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
             // never returns nil for a valid buffer, but fall back to
             // empty just in case.
             let bytes = payload.readData( length: payload.readableBytes ) ?? Data()
-            await onMessageReceivedFromClient( bytes )
+            await onMessageReceivedFromClient( .binary( bytes ) )
 
         case .pong:
             // We don't currently send pings, so an unsolicited pong is
