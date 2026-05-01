@@ -56,19 +56,39 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
         return ( false, false )
     }
 
-    /// Default text-frame entry point. Looks up the endpoint's registered
-    /// `OnText` handler and runs it. Errors are logged, never silently
+    /// Default TEXT-frame entry point. Looks up the endpoint's registered
+    /// text handler and runs it. Errors are logged, never silently
     /// swallowed — silent catch was a debugging hazard on the legacy branch.
-    open func onTextMessageFromClient ( _ message: String ) async {
+    /// Subclasses can override either this overload or the binary one
+    /// below independently.
+    open func onMessageReceivedFromClient ( _ text: String ) async {
         let endPoint = allConnections.endPoint
-        guard let handler = endPoint.methods[ .TEXT ] else {
-            Log.debug( "WebSocket text frame on \(endPoint.uri) but no OnText handler registered" )
+        guard let handler = endPoint.textHandler else {
+            Log.debug( "WebSocket text frame on \(endPoint.uri) but no text handler registered" )
             return
         }
         do {
-            try await handler.run( message, self )
+            try await handler.run( text, self )
         } catch {
-            Log.error( "WebSocket OnText handler failed on \(endPoint.uri) for client \(id): \(error)" )
+            Log.error( "WebSocket text handler failed on \(endPoint.uri) for client \(id): \(error)" )
+        }
+    }
+
+    /// Default BINARY-frame entry point. Symmetric with the text overload:
+    /// looks up the endpoint's binary handler and runs it. Receive-side
+    /// binary is fully wired (no encoding needed — frames arrive as raw
+    /// bytes); send-side is still a TODO (see the `Data` overloads of
+    /// `sendMessageTo*` further down).
+    open func onMessageReceivedFromClient ( _ data: Data ) async {
+        let endPoint = allConnections.endPoint
+        guard let handler = endPoint.binaryHandler else {
+            Log.debug( "WebSocket binary frame on \(endPoint.uri) but no binary handler registered" )
+            return
+        }
+        do {
+            try await handler.run( data, self )
+        } catch {
+            Log.error( "WebSocket binary handler failed on \(endPoint.uri) for client \(id): \(error)" )
         }
     }
 
@@ -187,7 +207,7 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
                 // real client starts fragmenting.
                 Log.warning( "WebSocket received fragmented TEXT frame on \(allConnections.endPoint.uri); reassembly not implemented" )
             }
-            await onTextMessageFromClient( text )
+            await onMessageReceivedFromClient( text )
 
         case .ping:
             var data = frame.data
@@ -209,9 +229,20 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
             Log.debug( "WebSocket received CONTINUATION frame; ignored (reassembly not implemented)" )
 
         case .binary:
-            // BINARY surface is reserved; ignored for now so a stray
-            // binary frame doesn't tear down a text-only connection.
-            Log.debug( "WebSocket received BINARY frame on \(allConnections.endPoint.uri); ignored (no handler registered)" )
+            var payload = frame.data
+            if let mask = frame.maskKey { payload.webSocketUnmask( mask ) }
+            if frame.fin == false {
+                // Same caveat as `.text`: fragmented binary frames are
+                // delivered piecewise; reassembly across continuations
+                // is not implemented.
+                Log.warning( "WebSocket received fragmented BINARY frame on \(allConnections.endPoint.uri); reassembly not implemented" )
+            }
+            // Extract the raw bytes into a `Data` so user code doesn't
+            // need to know about NIO's `ByteBuffer`. `payload.readData`
+            // never returns nil for a valid buffer, but fall back to
+            // empty just in case.
+            let bytes = payload.readData( length: payload.readableBytes ) ?? Data()
+            await onMessageReceivedFromClient( bytes )
 
         case .pong:
             // We don't currently send pings, so an unsolicited pong is
