@@ -31,7 +31,7 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
     public let channel: Channel
 
     /// Back-reference to the bucket of all clients on this endpoint.
-    /// Lets `sendMessageToAll` / `sendMessageToAllButCaller` enumerate peers
+    /// Lets `sendMessageToAll` enumerate peers
     /// without round-tripping through the catalog.
     public let allConnections: ConnectedClientsToEndpoint
 
@@ -90,17 +90,23 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
         try await sendMessageToClient( text )
     }
 
-    /// Fan out a text frame to every peer on this endpoint.
+    /// Fan out a text frame to every peer on this endpoint, optionally
+    /// skipping the caller. Writes run in parallel via `withTaskGroup`
+    /// so a slow peer only delays its own delivery — the rest of the
+    /// cohort isn't blocked behind it. Per-peer failures are logged and
+    /// swallowed; this method never throws in practice, but the
+    /// signature stays `throws` to match the protocol. `channelInactive`
+    /// eventually evicts the dead client from the bucket.
     ///
-    /// Writes run in parallel via `withTaskGroup` so a slow peer only delays
-    /// its own delivery — the rest of the cohort isn't blocked behind it.
-    /// Per-peer failures are logged and swallowed; this method never throws
-    /// in practice, but the signature stays `throws` to match the protocol.
-    /// `channelInactive` eventually evicts the dead client from the bucket.
-    public func sendMessageToAll ( _ text: String ) async throws {
+    /// The protocol extension on `ConnectedWebSocketOperations` provides
+    /// the no-`skipCaller` convenience overload that defaults to `true`.
+    public func sendMessageToAll ( _ text: String, skipCaller: Bool ) async throws {
         let peers = allConnections.snapshot()
+        // Capture `self.id` into a local so the per-peer task closure
+        // doesn't retain `self`.
+        let myId = self.id
         await withTaskGroup( of: Void.self ) { group in
-            for peer in peers {
+            for peer in peers where !skipCaller || peer.id != myId {
                 group.addTask {
                     do {
                         try await peer.sendMessageToClient( text )
@@ -112,41 +118,21 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
         }
     }
 
-    /// Same fan-out as `sendMessageToAll`, but skips the caller. Captures
-    /// `self.id` into a local before the task group so the closures don't
-    /// retain `self`.
-    public func sendMessageToAllButCaller ( _ text: String ) async throws {
-        let peers = allConnections.snapshot()
-        let myId = self.id
-        await withTaskGroup( of: Void.self ) { group in
-            for peer in peers where peer.id != myId {
-                group.addTask {
-                    do {
-                        try await peer.sendMessageToClient( text )
-                    } catch {
-                        Log.error( "WebSocket fan-out (skip-caller) failed for peer \(peer.id): \(error)" )
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: - Binary frames — surface declared, encoder TODO
     //
-    // The four overloads below mirror the text path one-for-one. Each
+    // The three overloads below mirror the text path one-for-one. Each
     // currently throws `WebSocketError.notImplemented` so callers can
     // compile against the final shape of the API but get a fast,
-    // discoverable failure if they invoke them. To enable binary support:
+    // discoverable failure if they invoke them. To enable binary send:
     //
     //   1. Implement `sendMessageToClient(_: Data)` to wrap the bytes
     //      in a `WebSocketFrame(opcode: .binary, ...)` and write to the
     //      channel — same shape as the text version above.
-    //   2. The other three overloads can then call through to it
-    //      (caller / fan-out / fan-out-skipping-caller) using the same
+    //   2. The other two overloads can then call through to it
+    //      (caller / fan-out with skipCaller) using the same
     //      `withTaskGroup` pattern as text.
-    //   3. Add `onBinary(_: Data)` on `WebSocketEndpoint` and dispatch
-    //      `.binary` opcodes in `gotFrame` to make the receive side
-    //      symmetrical.
+    //
+    // (Receive-side binary already works — see `gotFrame .binary`.)
 
     public func sendMessageToClient ( _ data: Data ) async throws {
         // TODO: implement binary frame encode + write.
@@ -158,14 +144,10 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
         throw WebSocketError.notImplemented( "ConnectedWebSocket.sendMessageToCaller(_: Data)" )
     }
 
-    public func sendMessageToAll ( _ data: Data ) async throws {
-        // TODO: parallel fan-out using sendMessageToClient(_: Data).
-        throw WebSocketError.notImplemented( "ConnectedWebSocket.sendMessageToAll(_: Data)" )
-    }
-
-    public func sendMessageToAllButCaller ( _ data: Data ) async throws {
-        // TODO: parallel fan-out using sendMessageToClient(_: Data), skipping self.
-        throw WebSocketError.notImplemented( "ConnectedWebSocket.sendMessageToAllButCaller(_: Data)" )
+    public func sendMessageToAll ( _ data: Data, skipCaller: Bool ) async throws {
+        // TODO: parallel fan-out using sendMessageToClient(_: Data),
+        // honouring `skipCaller` the same way the text version does.
+        throw WebSocketError.notImplemented( "ConnectedWebSocket.sendMessageToAll(_: Data, skipCaller:)" )
     }
 
     // MARK: - Frame dispatch

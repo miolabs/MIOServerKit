@@ -284,14 +284,14 @@ final class WebSocketServerTests: XCTestCase
         try server.terminateServer()
     }
 
-    // MARK: fan-out — caller broadcasts to peers via sendMessageToAllButCaller
+    // MARK: fan-out — caller broadcasts to peers via sendMessageToAll (skipCaller defaults to true)
 
     func test_BroadcastSkipsCaller () async throws {
         let clientMessage = "I changed something"
         let ep = WebSocketEndpoint( "/socket" ).onMessageReceived { message, ops in
             guard let text = message.text() else { XCTFail( "expected text frame" ); return }
             XCTAssertEqual( text, clientMessage )
-            try await ops.sendMessageToAllButCaller( clientMessage )
+            try await ops.sendMessageToAll( clientMessage )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
 

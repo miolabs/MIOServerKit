@@ -21,9 +21,15 @@ public typealias EndpointURI = String
 public protocol ConnectedWebSocketOperations: AnyObject, Sendable
 {
     // MARK: Text frames — implemented.
+
     func sendMessageToCaller ( _ text: String ) async throws
-    func sendMessageToAll ( _ text: String ) async throws
-    func sendMessageToAllButCaller ( _ text: String ) async throws
+
+    /// Broadcast to every peer on this endpoint. `skipCaller` defaults
+    /// to `true` (via the protocol extension below) because the most
+    /// common pattern — chat-style fan-out — wants the sender excluded
+    /// since they already have a local copy of the message. Pass
+    /// `skipCaller: false` for echo-to-everyone scenarios.
+    func sendMessageToAll ( _ text: String, skipCaller: Bool ) async throws
 
     // MARK: Binary frames — surface declared, encoder TODO.
     //
@@ -32,8 +38,26 @@ public protocol ConnectedWebSocketOperations: AnyObject, Sendable
     // `WebSocketError.notImplemented`; flip on the binary frame
     // encoder + opcode dispatch and they light up.
     func sendMessageToCaller ( _ data: Data ) async throws
-    func sendMessageToAll ( _ data: Data ) async throws
-    func sendMessageToAllButCaller ( _ data: Data ) async throws
+    func sendMessageToAll ( _ data: Data, skipCaller: Bool ) async throws
+}
+
+extension ConnectedWebSocketOperations
+{
+    /// Convenience overload — `skipCaller` defaults to `true` for the
+    /// common chat / broadcast case.
+    ///
+    /// Lives in an extension because Swift's support for default
+    /// arguments in protocol method *requirements* is brittle (the
+    /// default sometimes does not flow through to call sites typed as
+    /// the protocol). The wrapper guarantees `ops.sendMessageToAll(text)`
+    /// always resolves cleanly through the protocol witness.
+    public func sendMessageToAll ( _ text: String ) async throws {
+        try await sendMessageToAll( text, skipCaller: true )
+    }
+
+    public func sendMessageToAll ( _ data: Data ) async throws {
+        try await sendMessageToAll( data, skipCaller: true )
+    }
 }
 
 /// All clients currently connected to a single WebSocket endpoint, plus a

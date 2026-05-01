@@ -103,7 +103,7 @@ public struct WebSocketMessageHandler: Sendable
 /// let chat = WebSocketEndpoint( "/chat" )
 ///     .onMessageReceived { message, ops in
 ///         if let text = message.text() {
-///             try await ops.sendMessageToAllButCaller( text )
+///             try await ops.sendMessageToAll( text )  // skipCaller defaults to true
 ///         } else if let data = message.data() {
 ///             // binary receive works today; binary send is TODO
 ///             _ = data
