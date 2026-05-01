@@ -90,7 +90,7 @@ final class ServerWebSocketHandler: ChannelInboundHandler, @unchecked Sendable
         // broadcast that races with the close doesn't try to write to a
         // dead channel.
         if !didRemoveFromCatalog {
-            catalog.RemoveClient( uri, connection.id )
+            catalog.removeClient( uri, connection.id )
             didRemoveFromCatalog = true
         }
 

@@ -31,7 +31,7 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
     public let channel: Channel
 
     /// Back-reference to the bucket of all clients on this endpoint.
-    /// Lets `SendTextToAll` / `SendTextToAllButCaller` enumerate peers
+    /// Lets `sendTextToAll` / `sendTextToAllButCaller` enumerate peers
     /// without round-tripping through the catalog.
     public let allConnections: ConnectedClientsToEndpoint
 
@@ -52,14 +52,14 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
     /// Override to short-circuit the default frame dispatch. Return
     /// `( frameProcessed: true, _ )` to skip default handling, or
     /// `( _, closeConnection: true )` to tear the connection down.
-    open func OnFrameFromClientProcessed ( _ frame: WebSocketFrame ) -> ( Bool, Bool ) {
+    open func onFrameFromClientProcessed ( _ frame: WebSocketFrame ) -> ( Bool, Bool ) {
         return ( false, false )
     }
 
     /// Default text-frame entry point. Looks up the endpoint's registered
     /// `OnText` handler and runs it. Errors are logged, never silently
     /// swallowed — silent catch was a debugging hazard on the legacy branch.
-    open func OnTextMessageFromClient ( _ message: String ) async {
+    open func onTextMessageFromClient ( _ message: String ) async {
         let endPoint = allConnections.endPoint
         guard let handler = endPoint.methods[ .TEXT ] else {
             Log.debug( "WebSocket text frame on \(endPoint.uri) but no OnText handler registered" )
@@ -74,15 +74,15 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
 
     // MARK: - ConnectedWebSocketOperations (reply primitives)
 
-    public func SendTextToClient ( _ text: String ) async throws {
+    public func sendTextToClient ( _ text: String ) async throws {
         var buffer = allocator.buffer( capacity: text.utf8.count )
         buffer.writeString( text )
         let frame = WebSocketFrame( fin: true, opcode: .text, data: buffer )
         try await channel.writeAndFlush( frame ).get()
     }
 
-    public func SendTextToCaller ( _ text: String ) async throws {
-        try await SendTextToClient( text )
+    public func sendTextToCaller ( _ text: String ) async throws {
+        try await sendTextToClient( text )
     }
 
     /// Fan out a text frame to every peer on this endpoint.
@@ -92,13 +92,13 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
     /// Per-peer failures are logged and swallowed; this method never throws
     /// in practice, but the signature stays `throws` to match the protocol.
     /// `channelInactive` eventually evicts the dead client from the bucket.
-    public func SendTextToAll ( _ text: String ) async throws {
+    public func sendTextToAll ( _ text: String ) async throws {
         let peers = allConnections.snapshot()
         await withTaskGroup( of: Void.self ) { group in
             for peer in peers {
                 group.addTask {
                     do {
-                        try await peer.SendTextToClient( text )
+                        try await peer.sendTextToClient( text )
                     } catch {
                         Log.error( "WebSocket fan-out failed for peer \(peer.id): \(error)" )
                     }
@@ -107,17 +107,17 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
         }
     }
 
-    /// Same fan-out as `SendTextToAll`, but skips the caller. Captures
+    /// Same fan-out as `sendTextToAll`, but skips the caller. Captures
     /// `self.id` into a local before the task group so the closures don't
     /// retain `self`.
-    public func SendTextToAllButCaller ( _ text: String ) async throws {
+    public func sendTextToAllButCaller ( _ text: String ) async throws {
         let peers = allConnections.snapshot()
         let myId = self.id
         await withTaskGroup( of: Void.self ) { group in
             for peer in peers where peer.id != myId {
                 group.addTask {
                     do {
-                        try await peer.SendTextToClient( text )
+                        try await peer.sendTextToClient( text )
                     } catch {
                         Log.error( "WebSocket fan-out (skip-caller) failed for peer \(peer.id): \(error)" )
                     }
@@ -130,11 +130,11 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
 
     /// Drives the frame protocol for a single inbound frame. Returns
     /// `true` when the connection should be closed (peer sent a close
-    /// frame, or a subclass requested it via `OnFrameFromClientProcessed`).
+    /// frame, or a subclass requested it via `onFrameFromClientProcessed`).
     /// Called from `ServerWebSocketHandler` on the channel's event loop
     /// thread bridged into a Task.
     func gotFrame ( _ frame: WebSocketFrame ) async throws -> Bool {
-        var ( frameProcessed, closeConnection ) = OnFrameFromClientProcessed( frame )
+        var ( frameProcessed, closeConnection ) = onFrameFromClientProcessed( frame )
         if closeConnection { return true }
         if frameProcessed { return false }
 
@@ -150,7 +150,7 @@ open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
                 // real client starts fragmenting.
                 Log.warning( "WebSocket received fragmented TEXT frame on \(allConnections.endPoint.uri); reassembly not implemented" )
             }
-            await OnTextMessageFromClient( text )
+            await onTextMessageFromClient( text )
 
         case .ping:
             var data = frame.data

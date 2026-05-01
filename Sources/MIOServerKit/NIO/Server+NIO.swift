@@ -25,7 +25,7 @@ open class NIOServer: Server
 
     /// Catalog of WebSocket endpoints + their connected clients. Public so
     /// application code and tests can drive broadcasts directly:
-    /// `server.webSocketCatalog.SendTextToAll(uri, text)`. Empty if the
+    /// `server.webSocketCatalog.sendTextToAll(uri, text)`. Empty if the
     /// server was constructed without `webSocketEndpoints` — in that case
     /// the upgrade handler refuses every WebSocket request and the HTTP
     /// path is unaffected.
@@ -53,7 +53,7 @@ open class NIOServer: Server
         group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
 
         let catalog = ConnectedWebSocketCatalog()
-        catalog.AddEndpoints( webSocketEndpoints )
+        catalog.addEndpoints( webSocketEndpoints )
         self.webSocketCatalog = catalog
 
         super.init(routes: routes)
@@ -129,7 +129,7 @@ open class NIOServer: Server
                 // endpoints. Returning `nil` aborts the upgrade — NIO then
                 // continues the request through the HTTP pipeline, which
                 // will respond with 404 from the regular router.
-                if catalog.ContainsEndpoint( head.uri ) {
+                if catalog.containsEndpoint( head.uri ) {
                     return channel.eventLoop.makeSucceededFuture( HTTPHeaders() )
                 } else {
                     return channel.eventLoop.makeSucceededFuture( nil )
@@ -162,7 +162,7 @@ open class NIOServer: Server
                 }
                 return removed.flatMap {
                     let clientId = UUID().uuidString
-                    guard let connection = catalog.AddClient(
+                    guard let connection = catalog.addClient(
                         head.uri, clientId, channel.allocator, channel
                     ) else {
                         Log.error( "WebSocket upgrade: bucket vanished for \(head.uri); closing" )

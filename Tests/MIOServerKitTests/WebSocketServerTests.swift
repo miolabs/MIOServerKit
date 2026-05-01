@@ -52,9 +52,9 @@ fileprivate func waitForClients (
     timeoutSeconds: Double = 3
 ) async throws {
     let deadline = Date().addingTimeInterval( timeoutSeconds )
-    while server.webSocketCatalog.ConnectedClientsCount( uri ) < expected {
+    while server.webSocketCatalog.connectedClientsCount( uri ) < expected {
         if Date() > deadline {
-            XCTFail( "Timed out waiting for \(expected) client(s) on \(uri); current = \(server.webSocketCatalog.ConnectedClientsCount(uri))" )
+            XCTFail( "Timed out waiting for \(expected) client(s) on \(uri); current = \(server.webSocketCatalog.connectedClientsCount(uri))" )
             return
         }
         try await Task.sleep( nanoseconds: 50_000_000 )  // 0.05s
@@ -203,7 +203,7 @@ final class WebSocketServerTests: XCTestCase
 
     func test_ClientSendsString () async throws {
         let received = expectation( description: "OnText fires with client message" )
-        let ep = WebSocketEndpoint( "/socket" ).OnText { message, _ in
+        let ep = WebSocketEndpoint( "/socket" ).onText { message, _ in
             XCTAssertEqual( message, "Hello server" )
             received.fulfill()
         }
@@ -232,21 +232,21 @@ final class WebSocketServerTests: XCTestCase
         await fulfillment( of: [ connected ], timeout: 3 )
         try await waitForClients( server, uri: "/socket", atLeast: 1 )
 
-        try await server.webSocketCatalog.SendTextToAll( "/socket", "Hello client" )
+        try await server.webSocketCatalog.sendTextToAll( "/socket", "Hello client" )
         _ = await clientTask.result
 
         try server.terminateServer()
     }
 
-    // MARK: round-trip — client speaks, server replies via SendTextToCaller
+    // MARK: round-trip — client speaks, server replies via sendTextToCaller
 
     func test_ClientSendsServerReplies () async throws {
         let clientMessage = "Hello server"
         let serverAnswer = "Hello client, I'm the server"
 
-        let ep = WebSocketEndpoint( "/socket" ).OnText { message, ops in
+        let ep = WebSocketEndpoint( "/socket" ).onText { message, ops in
             XCTAssertEqual( message, clientMessage )
-            try await ops.SendTextToCaller( serverAnswer )
+            try await ops.sendTextToCaller( serverAnswer )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
 
@@ -264,7 +264,7 @@ final class WebSocketServerTests: XCTestCase
         let clientAnswer = "Hello server, I'm the client"
 
         let received = expectation( description: "OnText fires with client reply" )
-        let ep = WebSocketEndpoint( "/socket" ).OnText { message, _ in
+        let ep = WebSocketEndpoint( "/socket" ).onText { message, _ in
             XCTAssertEqual( message, clientAnswer )
             received.fulfill()
         }
@@ -274,20 +274,20 @@ final class WebSocketServerTests: XCTestCase
             await connectToServerReadAndWrite( "\(testHost)/socket", serverMessage, clientAnswer )
         }
         try await waitForClients( server, uri: "/socket", atLeast: 1 )
-        try await server.webSocketCatalog.SendTextToAll( "/socket", serverMessage )
+        try await server.webSocketCatalog.sendTextToAll( "/socket", serverMessage )
         _ = await clientTask.result
 
         await fulfillment( of: [ received ], timeout: 3 )
         try server.terminateServer()
     }
 
-    // MARK: fan-out — caller broadcasts to peers via SendTextToAllButCaller
+    // MARK: fan-out — caller broadcasts to peers via sendTextToAllButCaller
 
     func test_BroadcastSkipsCaller () async throws {
         let clientMessage = "I changed something"
-        let ep = WebSocketEndpoint( "/socket" ).OnText { message, ops in
+        let ep = WebSocketEndpoint( "/socket" ).onText { message, ops in
             XCTAssertEqual( message, clientMessage )
-            try await ops.SendTextToAllButCaller( clientMessage )
+            try await ops.sendTextToAllButCaller( clientMessage )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
 
@@ -326,7 +326,7 @@ final class WebSocketServerTests: XCTestCase
         let size = 16 * 1024
         let payload = String( repeating: "U", count: size )
         let received = expectation( description: "OnText fires with full payload" )
-        let ep = WebSocketEndpoint( "/socket" ).OnText { message, _ in
+        let ep = WebSocketEndpoint( "/socket" ).onText { message, _ in
             XCTAssertEqual( message.count, size )
             received.fulfill()
         }
@@ -350,7 +350,7 @@ final class WebSocketServerTests: XCTestCase
         let notReceived = expectation( description: "OnText must NOT fire" )
         notReceived.isInverted = true
 
-        let ep = WebSocketEndpoint( "/socket" ).OnText { _, _ in
+        let ep = WebSocketEndpoint( "/socket" ).onText { _, _ in
             notReceived.fulfill()
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )

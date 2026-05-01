@@ -42,8 +42,8 @@ public struct WebSocketEndpointMethodHandler: Sendable
 /// Usage:
 /// ```swift
 /// let chat = WebSocketEndpoint( "/chat" )
-///     .OnText { message, ops in
-///         try await ops.SendTextToAllButCaller( message )
+///     .onText { message, ops in
+///         try await ops.sendTextToAllButCaller( message )
 ///     }
 /// let server = NIOServer( routes: router, webSocketEndpoints: [ chat ] )
 /// ```
@@ -63,7 +63,7 @@ public final class WebSocketEndpoint: @unchecked Sendable
     /// Register a handler for incoming text frames. Returns self so calls
     /// chain in the same style as the HTTP endpoint DSL.
     @discardableResult
-    public func OnText ( _ cb: @escaping WebSocketEndpointRequestDispatcher ) -> WebSocketEndpoint {
+    public func onText ( _ cb: @escaping WebSocketEndpointRequestDispatcher ) -> WebSocketEndpoint {
         methods[ .TEXT ] = WebSocketEndpointMethodHandler( cb: cb )
         return self
     }
