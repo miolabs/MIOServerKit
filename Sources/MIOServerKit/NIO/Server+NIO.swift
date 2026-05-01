@@ -10,6 +10,7 @@ import Foundation
 
 import NIO
 import NIOHTTP1
+import NIOWebSocket
 import MIOCoreLogger
 import MIOCore
 
@@ -18,10 +19,18 @@ open class NIOServer: Server
     let threadPool:NIOThreadPool
     let group:MultiThreadedEventLoopGroup
     let startedPromise = MultiThreadedEventLoopGroup(numberOfThreads: 1).next().makePromise(of: Void.self)
-    
+
     var bootstrap: ServerBootstrap!
     var channel: Channel!
-        
+
+    /// Catalog of WebSocket endpoints + their connected clients. Public so
+    /// application code and tests can drive broadcasts directly:
+    /// `server.webSocketCatalog.SendTextToAll(uri, text)`. Empty if the
+    /// server was constructed without `webSocketEndpoints` — in that case
+    /// the upgrade handler refuses every WebSocket request and the HTTP
+    /// path is unaffected.
+    public let webSocketCatalog: ConnectedWebSocketCatalog
+
     // Pool occupancy tracking. Updated at sync-handler dispatch boundaries
     // in ServerHTTPHandler. Single shared instance across all connections so
     // /health can report server-wide pool state, not per-connection state.
@@ -31,14 +40,22 @@ open class NIOServer: Server
     private var _poolTotalDispatched: UInt64 = 0
     private var _activeRequests: [UUID: (url: String, started: Date)] = [:]
 
-    
-    public override init(routes: Router)
+
+    /// Default-empty `webSocketEndpoints` keeps every existing call site
+    /// (`NIOServer(routes: r)`) source-compatible. The parent `Server`
+    /// declares only `init(routes:)`; this designated init shadows it.
+    public init ( routes: Router, webSocketEndpoints: [WebSocketEndpoint] = [] )
     {
         // Thread pool is usually tied to IO bound. Can be create more threads. Between 16 or 32 is a good balance
         let max_threads = MIOCoreIntValue( MCEnvironmentVar( "MIO_SERVER_KIT_MAX_THREADS"), 16 )!
         threadPool = NIOThreadPool(numberOfThreads: max_threads)
         // LoopGroup is tied to CPU bound so if better to keep to System.coreCount
         group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+
+        let catalog = ConnectedWebSocketCatalog()
+        catalog.AddEndpoints( webSocketEndpoints )
+        self.webSocketCatalog = catalog
+
         super.init(routes: routes)
     }
     
@@ -94,9 +111,89 @@ open class NIOServer: Server
         }
     }
     
+    /// Name under which `ServerHTTPHandler` is registered in the channel
+    /// pipeline. We need it by name so the WebSocket upgrade closure can
+    /// find and remove it — a stale HTTP handler downstream of the WS
+    /// frame decoder would crash on the first frame trying to unwrap it
+    /// as `HTTPServerRequestPart`.
+    private static let httpHandlerName = "MSK.ServerHTTPHandler"
+
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
-        return channel.pipeline.configureHTTPServerPipeline(withErrorHandling: true).flatMap {
-            channel.pipeline.addHandler( ServerHTTPHandler( router: self.router, threadPool: self.threadPool, server: self ) )
+        // Capture references locally so the upgrader closures (which run
+        // on the channel's event loop) don't have to retain `self`.
+        let catalog = self.webSocketCatalog
+
+        let wsUpgrader = NIOWebSocketServerUpgrader(
+            shouldUpgrade: { channel, head in
+                // Only accept upgrades for URIs registered as WebSocket
+                // endpoints. Returning `nil` aborts the upgrade — NIO then
+                // continues the request through the HTTP pipeline, which
+                // will respond with 404 from the regular router.
+                if catalog.ContainsEndpoint( head.uri ) {
+                    return channel.eventLoop.makeSucceededFuture( HTTPHeaders() )
+                } else {
+                    return channel.eventLoop.makeSucceededFuture( nil )
+                }
+            },
+            upgradePipelineHandler: { channel, head in
+                // Handshake succeeded. Three things have to happen, in order:
+                //
+                //   1. Remove the HTTP-side application handler. NIO's
+                //      upgrade handler removes its own HTTP framing
+                //      (encoder/decoder/upgrade handler) but knows nothing
+                //      about ours. If we leave `ServerHTTPHandler` in
+                //      place, the next inbound WebSocket frame reaches it
+                //      and the precondition in `unwrapInboundIn` panics.
+                //
+                //   2. Register the new client with the catalog so
+                //      broadcasts can find it.
+                //
+                //   3. Install `ServerWebSocketHandler` at the tail to
+                //      consume frames.
+                // The HTTP application handler does not speak WebSocket
+                // frames; if left in place it will crash the next inbound
+                // frame with a type mismatch. It conforms to
+                // `RemovableChannelHandler` so this removal succeeds
+                // synchronously on the event loop. Failure here is not
+                // recoverable — propagate it so the channel closes.
+                let removed = channel.pipeline.removeHandler( name: NIOServer.httpHandlerName )
+                removed.whenFailure { error in
+                    Log.error( "WS removeHandler(\(NIOServer.httpHandlerName)) failed: \(error)" )
+                }
+                return removed.flatMap {
+                    let clientId = UUID().uuidString
+                    guard let connection = catalog.AddClient(
+                        head.uri, clientId, channel.allocator, channel
+                    ) else {
+                        Log.error( "WebSocket upgrade: bucket vanished for \(head.uri); closing" )
+                        return channel.close()
+                    }
+                    return channel.pipeline.addHandler(
+                        ServerWebSocketHandler( uri: head.uri, connection: connection, catalog: catalog )
+                    )
+                }
+            }
+        )
+
+        let upgradeConfig: NIOHTTPServerUpgradeConfiguration = (
+            upgraders: [ wsUpgrader ],
+            completionHandler: { _ in
+                // Once an upgrade succeeds NIO removes its own HTTP
+                // handlers automatically. Our application handler is
+                // removed by the upgradePipelineHandler closure above.
+            }
+        )
+
+        return channel.pipeline.configureHTTPServerPipeline(
+            withServerUpgrade: upgradeConfig,
+            withErrorHandling: true
+        ).flatMap {
+            // The HTTP handler runs only on non-upgraded connections.
+            // Named so the upgrade closure can locate and remove it.
+            channel.pipeline.addHandler(
+                ServerHTTPHandler( router: self.router, threadPool: self.threadPool, server: self ),
+                name: NIOServer.httpHandlerName
+            )
         }
     }
     

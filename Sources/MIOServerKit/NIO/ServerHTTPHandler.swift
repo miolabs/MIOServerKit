@@ -14,7 +14,12 @@ import MIOCore
 import MIOCoreLogger
 
 
-class ServerHTTPHandler: ChannelInboundHandler
+// `RemovableChannelHandler` is needed so the WebSocket upgrade path can
+// pull this handler out of the pipeline once a connection has been
+// promoted to WebSocket — frames must reach `ServerWebSocketHandler`
+// directly, not pass through the HTTP application handler. The protocol
+// is a marker, no extra methods are required.
+class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
 {
     public typealias InboundIn = HTTPServerRequestPart
     public typealias OutboundOut = HTTPServerResponsePart

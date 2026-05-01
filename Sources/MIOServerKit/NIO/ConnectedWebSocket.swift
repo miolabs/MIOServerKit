@@ -1,0 +1,190 @@
+//
+//  ConnectedWebSocket.swift
+//
+//
+//  Per-connection state for an upgraded WebSocket channel. Owns the frame
+//  decode loop (text / ping / close / continuation) and exposes the reply
+//  primitives declared by `ConnectedWebSocketOperations`.
+//
+//  Designed for the classic NIO pipeline: writes go through `Channel`'s
+//  outbound side, and the WebSocket frame encoder (installed by the
+//  upgrader) converts `WebSocketFrame` to bytes before they hit the wire.
+//
+
+import Foundation
+import NIOCore
+import NIOWebSocket
+import MIOCoreLogger
+
+open class ConnectedWebSocket: ConnectedWebSocketOperations, @unchecked Sendable
+{
+    /// Stable id assigned at upgrade time. Used as the catalog key and
+    /// surfaced in logs so a misbehaving client can be tracked across
+    /// frames without leaking the underlying socket address.
+    public let id: ConnectedClientID
+    public let allocator: ByteBufferAllocator
+
+    /// The upgraded channel. `Channel` is `Sendable` in current swift-nio;
+    /// `writeAndFlush` is thread-safe (it hops to the channel's event loop
+    /// internally). We keep a strong reference so reply primitives can be
+    /// called from any Task without worrying about lifetime.
+    public let channel: Channel
+
+    /// Back-reference to the bucket of all clients on this endpoint.
+    /// Lets `SendTextToAll` / `SendTextToAllButCaller` enumerate peers
+    /// without round-tripping through the catalog.
+    public let allConnections: ConnectedClientsToEndpoint
+
+    required public init (
+        _ id: ConnectedClientID,
+        _ allocator: ByteBufferAllocator,
+        _ channel: Channel,
+        _ allConnections: ConnectedClientsToEndpoint
+    ) {
+        self.id = id
+        self.allocator = allocator
+        self.channel = channel
+        self.allConnections = allConnections
+    }
+
+    // MARK: - Subclass hooks
+
+    /// Override to short-circuit the default frame dispatch. Return
+    /// `( frameProcessed: true, _ )` to skip default handling, or
+    /// `( _, closeConnection: true )` to tear the connection down.
+    open func OnFrameFromClientProcessed ( _ frame: WebSocketFrame ) -> ( Bool, Bool ) {
+        return ( false, false )
+    }
+
+    /// Default text-frame entry point. Looks up the endpoint's registered
+    /// `OnText` handler and runs it. Errors are logged, never silently
+    /// swallowed — silent catch was a debugging hazard on the legacy branch.
+    open func OnTextMessageFromClient ( _ message: String ) async {
+        let endPoint = allConnections.endPoint
+        guard let handler = endPoint.methods[ .TEXT ] else {
+            Log.debug( "WebSocket text frame on \(endPoint.uri) but no OnText handler registered" )
+            return
+        }
+        do {
+            try await handler.run( message, self )
+        } catch {
+            Log.error( "WebSocket OnText handler failed on \(endPoint.uri) for client \(id): \(error)" )
+        }
+    }
+
+    // MARK: - ConnectedWebSocketOperations (reply primitives)
+
+    public func SendTextToClient ( _ text: String ) async throws {
+        var buffer = allocator.buffer( capacity: text.utf8.count )
+        buffer.writeString( text )
+        let frame = WebSocketFrame( fin: true, opcode: .text, data: buffer )
+        try await channel.writeAndFlush( frame ).get()
+    }
+
+    public func SendTextToCaller ( _ text: String ) async throws {
+        try await SendTextToClient( text )
+    }
+
+    /// Fan out a text frame to every peer on this endpoint.
+    ///
+    /// Writes run in parallel via `withTaskGroup` so a slow peer only delays
+    /// its own delivery — the rest of the cohort isn't blocked behind it.
+    /// Per-peer failures are logged and swallowed; this method never throws
+    /// in practice, but the signature stays `throws` to match the protocol.
+    /// `channelInactive` eventually evicts the dead client from the bucket.
+    public func SendTextToAll ( _ text: String ) async throws {
+        let peers = allConnections.snapshot()
+        await withTaskGroup( of: Void.self ) { group in
+            for peer in peers {
+                group.addTask {
+                    do {
+                        try await peer.SendTextToClient( text )
+                    } catch {
+                        Log.error( "WebSocket fan-out failed for peer \(peer.id): \(error)" )
+                    }
+                }
+            }
+        }
+    }
+
+    /// Same fan-out as `SendTextToAll`, but skips the caller. Captures
+    /// `self.id` into a local before the task group so the closures don't
+    /// retain `self`.
+    public func SendTextToAllButCaller ( _ text: String ) async throws {
+        let peers = allConnections.snapshot()
+        let myId = self.id
+        await withTaskGroup( of: Void.self ) { group in
+            for peer in peers where peer.id != myId {
+                group.addTask {
+                    do {
+                        try await peer.SendTextToClient( text )
+                    } catch {
+                        Log.error( "WebSocket fan-out (skip-caller) failed for peer \(peer.id): \(error)" )
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Frame dispatch
+
+    /// Drives the frame protocol for a single inbound frame. Returns
+    /// `true` when the connection should be closed (peer sent a close
+    /// frame, or a subclass requested it via `OnFrameFromClientProcessed`).
+    /// Called from `ServerWebSocketHandler` on the channel's event loop
+    /// thread bridged into a Task.
+    func gotFrame ( _ frame: WebSocketFrame ) async throws -> Bool {
+        var ( frameProcessed, closeConnection ) = OnFrameFromClientProcessed( frame )
+        if closeConnection { return true }
+        if frameProcessed { return false }
+
+        switch frame.opcode {
+        case .text:
+            var data = frame.data
+            if let mask = frame.maskKey { data.webSocketUnmask( mask ) }
+            let text = data.getString( at: data.readerIndex, length: data.readableBytes ) ?? ""
+            if frame.fin == false {
+                // Fragmented frames: payload is delivered now, continuation
+                // frames will follow. The current implementation does not
+                // reassemble — left as a follow-up. Log so we notice if a
+                // real client starts fragmenting.
+                Log.warning( "WebSocket received fragmented TEXT frame on \(allConnections.endPoint.uri); reassembly not implemented" )
+            }
+            await OnTextMessageFromClient( text )
+
+        case .ping:
+            var data = frame.data
+            if let mask = frame.maskKey { data.webSocketUnmask( mask ) }
+            let pong = WebSocketFrame( fin: true, opcode: .pong, data: data )
+            try await channel.writeAndFlush( pong ).get()
+
+        case .connectionClose:
+            // Echo the status code per RFC 6455 §5.5.1, then signal closure.
+            var unmasked = frame.unmaskedData
+            let codeSlice = unmasked.readSlice( length: 2 ) ?? ByteBuffer()
+            let closeFrame = WebSocketFrame( fin: true, opcode: .connectionClose, data: codeSlice )
+            try await channel.writeAndFlush( closeFrame ).get()
+            closeConnection = true
+
+        case .continuation:
+            // Continuation frames belong to a fragmented message — see
+            // the note under `.text`. Drop until reassembly lands.
+            Log.debug( "WebSocket received CONTINUATION frame; ignored (reassembly not implemented)" )
+
+        case .binary:
+            // BINARY surface is reserved; ignored for now so a stray
+            // binary frame doesn't tear down a text-only connection.
+            Log.debug( "WebSocket received BINARY frame on \(allConnections.endPoint.uri); ignored (no handler registered)" )
+
+        case .pong:
+            // We don't currently send pings, so an unsolicited pong is
+            // benign. Ignore.
+            break
+
+        default:
+            Log.warning( "WebSocket received unknown opcode \(frame.opcode) on \(allConnections.endPoint.uri)" )
+        }
+
+        return closeConnection
+    }
+}
