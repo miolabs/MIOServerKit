@@ -25,7 +25,7 @@ open class NIOServer: Server
 
     /// Catalog of WebSocket endpoints + their connected clients. Public so
     /// application code and tests can drive broadcasts directly:
-    /// `server.webSocketCatalog.sendTextToAll(uri, text)`. Empty if the
+    /// `server.webSocketCatalog.sendMessageToAll(uri, text)`. Empty if the
     /// server was constructed without `webSocketEndpoints` — in that case
     /// the upgrade handler refuses every WebSocket request and the HTTP
     /// path is unaffected.

@@ -43,7 +43,7 @@ public struct WebSocketEndpointMethodHandler: Sendable
 /// ```swift
 /// let chat = WebSocketEndpoint( "/chat" )
 ///     .onText { message, ops in
-///         try await ops.sendTextToAllButCaller( message )
+///         try await ops.sendMessageToAllButCaller( message )
 ///     }
 /// let server = NIOServer( routes: router, webSocketEndpoints: [ chat ] )
 /// ```

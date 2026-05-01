@@ -20,9 +20,20 @@ public typealias EndpointURI = String
 /// public DSL doesn't depend on the concrete connection type.
 public protocol ConnectedWebSocketOperations: AnyObject, Sendable
 {
-    func sendTextToCaller ( _ text: String ) async throws
-    func sendTextToAll ( _ text: String ) async throws
-    func sendTextToAllButCaller ( _ text: String ) async throws
+    // MARK: Text frames — implemented.
+    func sendMessageToCaller ( _ text: String ) async throws
+    func sendMessageToAll ( _ text: String ) async throws
+    func sendMessageToAllButCaller ( _ text: String ) async throws
+
+    // MARK: Binary frames — surface declared, encoder TODO.
+    //
+    // These overloads exist so application code can compile against the
+    // final shape of the API. They currently throw
+    // `WebSocketError.notImplemented`; flip on the binary frame
+    // encoder + opcode dispatch and they light up.
+    func sendMessageToCaller ( _ data: Data ) async throws
+    func sendMessageToAll ( _ data: Data ) async throws
+    func sendMessageToAllButCaller ( _ data: Data ) async throws
 }
 
 /// All clients currently connected to a single WebSocket endpoint, plus a
@@ -72,7 +83,7 @@ public final class ConnectedClientsToEndpoint: @unchecked Sendable
 ///
 /// Concurrency: every public method is short and non-suspending. Internal
 /// state is protected by an `NIOLock` (faster than `NSLock` and explicitly
-/// designed for NIO). The async `sendTextToAll` snapshots the client list
+/// designed for NIO). The async `sendMessageToAll` snapshots the client list
 /// under the lock and writes outside of it so we never await while holding.
 public final class ConnectedWebSocketCatalog: @unchecked Sendable
 {
@@ -147,9 +158,9 @@ public final class ConnectedWebSocketCatalog: @unchecked Sendable
     /// task so a slow peer only delays itself, not the rest of the cohort.
     /// Per-peer failures are logged and skipped; the broadcast as a whole
     /// never throws, so the caller's `try` is decorative — kept on the API
-    /// surface for symmetry with `sendTextToCaller` which can fail.
+    /// surface for symmetry with `sendMessageToCaller` which can fail.
     /// `channelInactive` eventually evicts the dead client from the bucket.
-    public func sendTextToAll ( _ uri: String, _ text: String ) async throws {
+    public func sendMessageToAll ( _ uri: String, _ text: String ) async throws {
         lock.lock()
         let bucket = webSockets[ uri ]
         lock.unlock()
@@ -160,12 +171,26 @@ public final class ConnectedWebSocketCatalog: @unchecked Sendable
             for client in snapshot {
                 group.addTask {
                     do {
-                        try await client.sendTextToClient( text )
+                        try await client.sendMessageToClient( text )
                     } catch {
                         Log.error( "WebSocket broadcast failed for client \(client.id) on \(uri): \(error)" )
                     }
                 }
             }
         }
+    }
+
+    /// Binary broadcast — surface declared, encoder TODO.
+    ///
+    /// Mirrors the text overload above. When the binary frame encoder
+    /// lands on `ConnectedWebSocket.sendMessageToClient(_: Data)`, this
+    /// stub can be replaced with the same `withTaskGroup` fan-out pattern
+    /// used for text. Until then it throws so callers fail fast rather
+    /// than silently no-op.
+    public func sendMessageToAll ( _ uri: String, _ data: Data ) async throws {
+        // TODO: implement once ConnectedWebSocket.sendMessageToClient(_: Data) lands.
+        throw WebSocketError.notImplemented(
+            "ConnectedWebSocketCatalog.sendMessageToAll(_:_: Data)"
+        )
     }
 }

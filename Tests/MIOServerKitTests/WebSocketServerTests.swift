@@ -232,13 +232,13 @@ final class WebSocketServerTests: XCTestCase
         await fulfillment( of: [ connected ], timeout: 3 )
         try await waitForClients( server, uri: "/socket", atLeast: 1 )
 
-        try await server.webSocketCatalog.sendTextToAll( "/socket", "Hello client" )
+        try await server.webSocketCatalog.sendMessageToAll( "/socket", "Hello client" )
         _ = await clientTask.result
 
         try server.terminateServer()
     }
 
-    // MARK: round-trip — client speaks, server replies via sendTextToCaller
+    // MARK: round-trip — client speaks, server replies via sendMessageToCaller
 
     func test_ClientSendsServerReplies () async throws {
         let clientMessage = "Hello server"
@@ -246,7 +246,7 @@ final class WebSocketServerTests: XCTestCase
 
         let ep = WebSocketEndpoint( "/socket" ).onText { message, ops in
             XCTAssertEqual( message, clientMessage )
-            try await ops.sendTextToCaller( serverAnswer )
+            try await ops.sendMessageToCaller( serverAnswer )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
 
@@ -274,20 +274,20 @@ final class WebSocketServerTests: XCTestCase
             await connectToServerReadAndWrite( "\(testHost)/socket", serverMessage, clientAnswer )
         }
         try await waitForClients( server, uri: "/socket", atLeast: 1 )
-        try await server.webSocketCatalog.sendTextToAll( "/socket", serverMessage )
+        try await server.webSocketCatalog.sendMessageToAll( "/socket", serverMessage )
         _ = await clientTask.result
 
         await fulfillment( of: [ received ], timeout: 3 )
         try server.terminateServer()
     }
 
-    // MARK: fan-out — caller broadcasts to peers via sendTextToAllButCaller
+    // MARK: fan-out — caller broadcasts to peers via sendMessageToAllButCaller
 
     func test_BroadcastSkipsCaller () async throws {
         let clientMessage = "I changed something"
         let ep = WebSocketEndpoint( "/socket" ).onText { message, ops in
             XCTAssertEqual( message, clientMessage )
-            try await ops.sendTextToAllButCaller( clientMessage )
+            try await ops.sendMessageToAllButCaller( clientMessage )
         }
         let server = try await launchServer( webSocketEndpoints: [ ep ] )
 
