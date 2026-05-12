@@ -31,20 +31,16 @@ open class NIOServer: Server
     /// path is unaffected.
     public let webSocketCatalog: ConnectedWebSocketCatalog
 
-    // Pool occupancy tracking. Updated at sync-handler dispatch boundaries
-    // in ServerHTTPHandler. Single shared instance across all connections so
-    // /health can report server-wide pool state, not per-connection state.
-    private let poolStatsLock = NSLock()
-    private var _poolActive: Int = 0
-    private var _poolPeak: Int = 0
-    private var _poolTotalDispatched: UInt64 = 0
-    private var _activeRequests: [UUID: (url: String, started: Date)] = [:]
-
+    /// Single observer for request, server, and WebSocket lifecycle
+    /// events. Weak so the application owns the observer's lifetime;
+    /// the server never extends it. Apps that need fan-out to multiple
+    /// sinks should compose their own observer that forwards to each.
+    weak var observer: ServerObserver? = nil
 
     /// Default-empty `webSocketEndpoints` keeps every existing call site
     /// (`NIOServer(routes: r)`) source-compatible. The parent `Server`
     /// declares only `init(routes:)`; this designated init shadows it.
-    public init ( routes: Router, webSocketEndpoints: [WebSocketEndpoint] = [] )
+    public init ( routes: Router, webSocketEndpoints: [WebSocketEndpoint] = [], observer: ServerObserver? = nil )
     {
         // Thread pool is usually tied to IO bound. Can be create more threads. Between 16 or 32 is a good balance
         let max_threads = MIOCoreIntValue( MCEnvironmentVar( "MIO_SERVER_KIT_MAX_THREADS"), 16 )!
@@ -56,6 +52,9 @@ open class NIOServer: Server
         catalog.addEndpoints( webSocketEndpoints )
         self.webSocketCatalog = catalog
 
+        self.observer = observer
+        webSocketCatalog.observer = observer
+        
         super.init(routes: routes)
     }
     
@@ -88,21 +87,24 @@ open class NIOServer: Server
             }
                         
             Log.info( "Server started and listening on \(channelLocalAddress)" )
-            
+
+            observer?.serverDidStart( port: port )
+
             // ✅ announce “server is ready”
             startedPromise.succeed(())
-            
+
             // This will never unblock until terminateServer() is called
             try channel.closeFuture.wait()
-            
+
             shutdown()
         } catch {
             Log.critical("\(error)")
             shutdown()
         }
     }
-    
+
     private func shutdown() {
+        observer?.serverWillShutdown()
         threadPool.shutdownGracefully { error in
             if let error = error { Log.error("ThreadPool shutdown error: \(error)") }
         }
@@ -235,82 +237,10 @@ open class NIOServer: Server
     }
 }
 
-// Thread pool debug
-
+/// Read-only snapshot of the configured thread pool. Apps that want to
+/// expose pool size in their `/health` payload can read this without
+/// reaching into NIO internals.
 extension NIOServer
 {
-    /// Increments the active-worker count. Call at the start of any dispatch
-    /// path that occupies a NIOThreadPool worker (currently: .sync handlers).
-    /// Returns the new active count for logging convenience.
-    @discardableResult
-    func poolStats_enter() -> Int {
-        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-        _poolActive += 1
-        _poolTotalDispatched += 1
-        if _poolActive > _poolPeak { _poolPeak = _poolActive }
-        return _poolActive
-    }
-
-    /// Decrements the active-worker count. Must be paired with every
-    /// poolStats_enter() call, including on error paths.
-    func poolStats_exit() {
-        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-        _poolActive -= 1
-    }
-
-    /// Snapshot of current pool state. Safe to call from any thread.
-    public struct PoolStats {
-        public let active: Int             // workers running handler code right now
-        public let peak: Int               // high-water mark since last reset
-        public let totalDispatched: UInt64 // monotonic count of all dispatches ever
-        public let configured: Int         // pool size from config
-    }
-
-    public func poolStats() -> PoolStats {
-        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-        return PoolStats(active: _poolActive,
-                         peak: _poolPeak,
-                         totalDispatched: _poolTotalDispatched,
-                         configured: threadPool.numberOfThreads)
-    }
-
-    /// Resets the peak counter. Useful for periodic monitoring where you want
-    /// to see "peak in the last N seconds" rather than peak-since-startup.
-    public func poolStats_resetPeak() {
-        poolStatsLock.lock(); defer { poolStatsLock.unlock() }
-        _poolPeak = _poolActive   // reset to current active, not 0
-    }
-    
-    func poolStats_enterWithRequest(url: String) -> UUID {
-        let id = UUID()
-        poolStatsLock.lock()
-        _poolActive += 1
-        _poolTotalDispatched &+= 1
-        if _poolActive > _poolPeak { _poolPeak = _poolActive }
-        _activeRequests[id] = (url: url, started: Date())
-        poolStatsLock.unlock()
-        return id
-    }
-
-    func poolStats_exitWithRequest(_ id: UUID) {
-        poolStatsLock.lock()
-        _poolActive -= 1
-        _activeRequests.removeValue(forKey: id)
-        poolStatsLock.unlock()
-    }
-    
-    public struct ActiveRequest {
-        public let url: String
-        public let ageSeconds: Double
-    }
-
-    public func poolStats_inFlight() -> [ActiveRequest] {
-        poolStatsLock.lock()
-        defer { poolStatsLock.unlock() }
-        let now = Date()
-        return _activeRequests.values
-            .map { ActiveRequest( url: $0.url
-                                , ageSeconds: now.timeIntervalSince($0.started) ) }
-            .sorted { $0.ageSeconds > $1.ageSeconds }
-    }
+    public var configuredThreadPoolSize: Int { threadPool.numberOfThreads }
 }

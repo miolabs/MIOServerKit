@@ -135,6 +135,16 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
             let req = self.request!
             let res = self.response!
 
+            // Single observer span covers all three execution types so the
+            // app can measure full dispatch latency including queue time.
+            // `nil` when no observer is set or the observer chose to skip
+            // this request — keep the hot path branch-light.
+            let span = self.server?.observer?.requestWillDispatch(
+                url: path,
+                method: method.rawValue,
+                executionType: endpoint_spec.executionType
+            )
+
             // Each execution path produces an EventLoopFuture<MethodEndpointResult>.
             // After this switch, a single `whenComplete` translates the result into
             // the dispatcher's completion callback. No manual loop.execute is
@@ -155,19 +165,9 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
                 // fails if the pool is shutting down (covered by the outer .failure
                 // branch in whenComplete below).
                 Log.trace("Starting sync endpoint")
-                let requestPath = path   // captured by value into the closure for in-flight tracking
                 future = threadPool.runIfActive(eventLoop: loop) {
                     Log.trace("Thread pool work start")
-                    // enterWithRequest registers this dispatch in _activeRequests so
-                    // /health can list it by URL and age. Returns nil if `server` was
-                    // released (shouldn't happen during normal operation).
-                    let requestID = self.server?.poolStats_enterWithRequest(url: requestPath)
-                    defer {
-                        Log.trace("Thread pool work end")
-                        if let id = requestID {
-                            self.server?.poolStats_exitWithRequest(id)
-                        }
-                    }
+                    defer { Log.trace("Thread pool work end") }
                     return endpoint_spec.runSync(req, res)
                 }
 
@@ -200,12 +200,15 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
                 switch outcome {
                 case .success(.success(let value)):
                     Log.trace("Endpoint completed")
+                    span?.end(error: nil)
                     completion(value, nil)
                 case .success(.failure(let error)):
                     Log.trace("Endpoint failed")
+                    span?.end(error: error)
                     completion(nil, error)
                 case .failure(let error):
                     Log.trace("Endpoint dispatch failed: \(error)")
+                    span?.end(error: error)
                     completion(nil, error)
                 }
             }

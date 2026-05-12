@@ -114,6 +114,12 @@ public final class ConnectedWebSocketCatalog: @unchecked Sendable
     private var webSockets: [ EndpointURI: ConnectedClientsToEndpoint ] = [:]
     private let lock = NIOLock()
 
+    /// Lifecycle observer set by `NIOServer` when the application
+    /// assigns one. The catalog calls connect/disconnect hooks outside
+    /// the catalog lock to keep observer code from blocking other
+    /// catalog operations.
+    public weak var observer: ServerObserver?
+
     public init () {}
 
     /// Register endpoint definitions. Called once at server construction.
@@ -162,18 +168,31 @@ public final class ConnectedWebSocketCatalog: @unchecked Sendable
         _ allocator: ByteBufferAllocator,
         _ channel: Channel
     ) -> ConnectedWebSocket? {
-        lock.lock(); defer { lock.unlock() }
-        guard let bucket = webSockets[ uri ] else { return nil }
+        lock.lock()
+        guard let bucket = webSockets[ uri ] else {
+            lock.unlock()
+            return nil
+        }
         let client = ConnectedWebSocket( newClientId, allocator, channel, bucket )
         bucket.addClient( newClientId, client )
+        lock.unlock()
+
+        observer?.webSocketClientConnected( uri: uri, clientId: newClientId )
         return client
     }
 
     /// Remove a client. Idempotent — safe to call from `channelInactive`
-    /// even if the upgrade never completed.
+    /// even if the upgrade never completed. The observer disconnect hook
+    /// only fires when a client was actually removed, so repeated cleanup
+    /// calls don't double-emit.
     public func removeClient ( _ uri: String, _ clientId: ConnectedClientID ) {
-        lock.lock(); defer { lock.unlock() }
-        webSockets[ uri ]?.removeClient( clientId )
+        lock.lock()
+        let removed = webSockets[ uri ]?.removeClient( clientId ) != nil
+        lock.unlock()
+
+        if removed {
+            observer?.webSocketClientDisconnected( uri: uri, clientId: clientId )
+        }
     }
 
     /// Broadcast a text frame to every client connected to a given URI.

@@ -50,7 +50,7 @@ extension RouterContextProtocol
     public func queryParam ( _ name: String ) -> String? {
         return request.queryParameters[ name ]
     }
-    
+
     public func bodyAsData() -> Data? {
         return request.body
     }
