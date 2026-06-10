@@ -107,7 +107,11 @@ public class EndpointTree
         if path_node == nil { return nil }
         for n in var_nodes {
             if n.pathNode!.match( path_node! ) {
-                vars[ n.pathNode!.key ] = path_node!.key
+                // Capture the segment verbatim (`name`), not `key`: key has
+                // had any `(...)` stripped by the regex-constraint parsing,
+                // which is pattern syntax — request values like
+                // "chargeToAccount(_:)" must arrive intact.
+                vars[ n.pathNode!.key ] = path_node!.name
                 node = n
                 break
             }
@@ -120,7 +124,7 @@ public class EndpointTree
             for n in optionalPaths ?? [] {
                 if path_node == nil { break }
                 if n.match( path_node! ) {
-                    vars[ n.key ] = path_node!.key
+                    vars[ n.key ] = path_node!.name
                     path = path.drop_first()
                     path_node = path.parts.first
                     node = self
