@@ -138,6 +138,56 @@ server.router.endpoint("/users/:id").get { context in async throws -> Any? in
 }
 ```
 
+### Declarative endpoints with @Endpoint
+
+Instead of registering routes by hand, any function can publish itself as an endpoint with the `@Endpoint` annotation:
+
+```swift
+import MIOServerKit
+import MIOServerKitMacros
+
+@Endpoint( [.get, .post], path: "/api/schema/:schema" )
+func schemaHandler( context: RouterContext ) throws -> (any Sendable)? {
+    let schema: String = try context.urlParam( "schema" )
+    return [ "schema": schema ]
+}
+
+// Methods default to [.get]. Async handlers work too.
+@Endpoint( path: "/api/version" )
+func versionHandler( context: RouterContext ) async throws -> (any Sendable)? {
+    return "1.0"
+}
+
+// Static functions inside a type are supported as well.
+class EntityAPI {
+    @Endpoint( [.delete], path: "/api/entity/:id" )
+    static func deleteEntity( context: RouterContext ) throws -> (any Sendable)? { return nil }
+}
+```
+
+The macro itself is a compile-time validator only — Swift compiler plugins run inside a sandbox and cannot write files. The actual route registration file is produced by the `generate-endpoints` tool, which runs as a **pre-build step**. It parses all Swift sources with swift-syntax, collects every `@Endpoint` annotation and writes `Endpoints+Generated.swift`:
+
+```bash
+# From your server project (or hook it as an Xcode/CI pre-build phase):
+path/to/MIOServerKit/Scripts/generate_endpoints.sh \
+    --sources Sources/MyServer \
+    --output Sources/MyServer/Endpoints+Generated.swift
+
+# Optionally also emit a JSON description of the routes:
+#   --json endpoints.json
+# See all options:
+#   ... generate_endpoints.sh --help
+```
+
+The generated file extends `Router`, so the only manual step is:
+
+```swift
+let server = Server()
+server.router.registerGeneratedEndpoints()
+```
+
+The tool only rewrites the file when routes actually changed (so it never dirties incremental builds), fails the build on duplicate method+path registrations, and the macro reports malformed annotations (missing path, unsupported method, wrong handler signature) directly in the compiler diagnostics.
+
 ### Choosing a Backend
 
 By default, MIOServerKit will use the most appropriate backend available. To explicitly choose a backend:

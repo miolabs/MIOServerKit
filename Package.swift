@@ -12,6 +12,7 @@ let package = Package(
         // Products define the executables and libraries produced by a package, and make them visible to other packages.
         .library( name: "MIOServerKit", targets: ["MIOServerKit"] ),
         .library( name: "MIOServerKitMacros", targets: ["MIOServerKitMacros"] ),
+        .executable( name: "generate-endpoints", targets: ["generate-endpoints"] ),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -23,10 +24,31 @@ let package = Package(
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.
         // Targets can depend on other targets in this package, and on products in packages which this package depends on.
+        // MARK: - Endpoint generator
+        // Shared @Endpoint annotation parsing + route file generation.
+        // Used by the macro plugin (validation) and the generate-endpoints tool (codegen).
+        .target(
+            name: "EndpointGeneratorCore",
+            dependencies: [
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftParser", package: "swift-syntax"),
+            ]
+        ),
+        // Pre-build tool: scans sources for @Endpoint and writes the route registration file.
+        .executableTarget(
+            name: "generate-endpoints",
+            dependencies: [ "EndpointGeneratorCore" ]
+        ),
+        .testTarget(
+            name: "EndpointGeneratorTests",
+            dependencies: [ "EndpointGeneratorCore" ]
+        ),
+
         // MARK: - Macros
         .macro(
             name: "MIOServerKitMacrosPlugin",
             dependencies: [
+                "EndpointGeneratorCore",
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
                 .product(name: "MIOCoreLogger", package: "MIOCore"),
@@ -37,6 +59,7 @@ let package = Package(
             name: "MIOServerKitMacros",
             dependencies: [
                 "MIOServerKitMacrosPlugin",
+                "MIOServerKit",
                 .product(name: "NIOHTTP1", package: "swift-nio")
             ]
         ),

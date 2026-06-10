@@ -21,6 +21,17 @@ public enum EndpointMethod: String
     case HEAD    = "HEAD"
 }
 
+public extension EndpointMethod
+{
+    static let get     = EndpointMethod.GET
+    static let post    = EndpointMethod.POST
+    static let put     = EndpointMethod.PUT
+    static let patch   = EndpointMethod.PATCH
+    static let delete  = EndpointMethod.DELETE
+    static let options = EndpointMethod.OPTIONS
+    static let head    = EndpointMethod.HEAD
+}
+
 // MARK: - EndpointPath
 public class EndpointPath
 {
