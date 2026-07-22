@@ -208,6 +208,13 @@ open class RouterContext : MIOCoreContext, RouterContextProtocol, @unchecked Sen
         case let s as String:
             content_type = "text/plain"
             body = s.data(using: .utf8)
+        // Typed Codable responses. Must precede the [Any] case: an array of
+        // Encodable objects matches [Any] too, but JSONSerialization cannot
+        // serialize arbitrary objects. Heterogeneous [Any]/[String:Any] don't
+        // cast to Encodable, so they still fall through to the cases below.
+        case let e as any Encodable:
+            content_type = "application/json"
+            body = try JSONEncoder().encode(e)
         case let arr as [Any]:
             content_type = "application/json"
             body = try MIOCoreJsonValue(withJSONObject: arr)

@@ -280,6 +280,12 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
                 switch result {
                 case let d as Data  : self.buffer.writeData(d)
                 case let s as String: self.buffer.writeString(s)
+                // Same ordering rule as RouterContext.responseBodyData: typed
+                // Codable results must be encoded before the [Any] match.
+                case let e as any Encodable:
+                    self.response.headers.add(name: .contentType, value: "application/json" )
+                    let data = try JSONEncoder().encode(e)
+                    self.buffer.writeData(data)
                 case let arr as [Any]:
                     self.response.headers.add(name: .contentType, value: "application/json" )
                     let data = try MIOCoreJsonValue(withJSONObject: arr)
