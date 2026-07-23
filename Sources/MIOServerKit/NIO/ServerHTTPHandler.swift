@@ -278,22 +278,29 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
         else {
             do {
                 switch result {
-                case let d as Data  : self.buffer.writeData(d)
-                case let s as String: self.buffer.writeString(s)
+                case let d as Data  :
+                    self.buffer.writeData(d)
+                    Log.trace( "Response: \(d.count), \(String(describing: String(data: d, encoding: .utf8)))" )
+                case let s as String:
+                    self.buffer.writeString(s)
+                    Log.trace( "Response: \(s)" )
                 // Same ordering rule as RouterContext.responseBodyData: typed
                 // Codable results must be encoded before the [Any] match.
                 case let e as any Encodable:
                     self.response.headers.add(name: .contentType, value: "application/json" )
                     let data = try JSONEncoder().encode(e)
                     self.buffer.writeData(data)
+                    Log.trace( "Response: \(data.count), \(String(describing: String(data: data, encoding: .utf8)))" )
                 case let arr as [Any]:
                     self.response.headers.add(name: .contentType, value: "application/json" )
                     let data = try MIOCoreJsonValue(withJSONObject: arr)
                     self.buffer.writeData(data)
+                    Log.trace( "Response: \(data.count), \(String(describing: String(data: data, encoding: .utf8)))" )
                 case let dic as [String:Any]:
                     self.response.headers.add(name: .contentType, value: "application/json" )
                     let data = try MIOCoreJsonValue(withJSONObject: dic)
                     self.buffer.writeData(data)
+                    Log.trace( "Response: \(data.count), \(String(describing: String(data: data, encoding: .utf8)))" )
                 default: break
                 }
             }
