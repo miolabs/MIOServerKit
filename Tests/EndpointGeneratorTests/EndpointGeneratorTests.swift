@@ -28,6 +28,66 @@ final class EndpointScannerTests: XCTestCase
         XCTAssertEqual( result.endpoints[0].handler, "getSchema" )
         XCTAssertEqual( result.endpoints[0].context, "APIContext" )
         XCTAssertFalse( result.endpoints[0].isAsync )
+        XCTAssertEqual( result.endpoints[0].conditions, [] )
+    }
+
+    func test_scan_ifConfig_capturesCondition() {
+        let result = scan( """
+        #if DEBUG
+        @Endpoint( path: "/api/debug" )
+        func debugInfo( context: APIContext ) throws -> Any? { return nil }
+        #endif
+        """ )
+
+        XCTAssertTrue( result.diagnostics.isEmpty, "\(result.diagnostics)" )
+        XCTAssertEqual( result.endpoints.first?.conditions, ["DEBUG"] )
+    }
+
+    func test_scan_ifConfig_elseBranchesNegatePreviousConditions() {
+        let result = scan( """
+        #if os(Linux)
+        @Endpoint( path: "/api/info" )
+        func linuxInfo( context: APIContext ) throws -> Any? { return nil }
+        #elseif os(macOS)
+        @Endpoint( path: "/api/info" )
+        func macInfo( context: APIContext ) throws -> Any? { return nil }
+        #else
+        @Endpoint( path: "/api/info" )
+        func otherInfo( context: APIContext ) throws -> Any? { return nil }
+        #endif
+        """ )
+
+        XCTAssertEqual( result.endpoints.count, 3 )
+        XCTAssertEqual( result.endpoints[0].conditions, ["os(Linux)"] )
+        XCTAssertEqual( result.endpoints[1].conditions, ["!(os(Linux)) && (os(macOS))"] )
+        XCTAssertEqual( result.endpoints[2].conditions, ["!(os(Linux)) && !(os(macOS))"] )
+    }
+
+    func test_scan_ifConfig_nestedBlocksStackConditions() {
+        let result = scan( """
+        #if DEBUG
+        #if os(Linux)
+        @Endpoint( path: "/api/debug" )
+        func debugInfo( context: APIContext ) throws -> Any? { return nil }
+        #endif
+        #endif
+        """ )
+
+        XCTAssertEqual( result.endpoints.first?.conditions, ["DEBUG", "os(Linux)"] )
+    }
+
+    func test_scan_ifConfig_aroundEnclosingType() {
+        let result = scan( """
+        #if DEBUG
+        class DebugAPI {
+            @Endpoint( path: "/api/debug" )
+            static func info( context: APIContext ) throws -> Any? { return nil }
+        }
+        #endif
+        """ )
+
+        XCTAssertEqual( result.endpoints.first?.handler, "DebugAPI.info" )
+        XCTAssertEqual( result.endpoints.first?.conditions, ["DEBUG"] )
     }
 
     func test_scan_methodsAndPath() {
@@ -120,8 +180,8 @@ final class EndpointScannerTests: XCTestCase
 
 final class EndpointFileGeneratorTests: XCTestCase
 {
-    func endpoint( _ methods: [String], _ path: String, _ handler: String ) -> ScannedEndpoint {
-        return ScannedEndpoint( methods: methods, path: path, handler: handler, context: "APIContext", isAsync: false, file: "Test.swift", line: 1 )
+    func endpoint( _ methods: [String], _ path: String, _ handler: String, conditions: [String] = [] ) -> ScannedEndpoint {
+        return ScannedEndpoint( methods: methods, path: path, handler: handler, context: "APIContext", isAsync: false, conditions: conditions, file: "Test.swift", line: 1 )
     }
 
     func test_generateSwift_groupsMethodsOfSamePath() throws {
@@ -163,6 +223,83 @@ final class EndpointFileGeneratorTests: XCTestCase
         XCTAssertNoThrow( try generator.generateSwift() )
     }
 
+    func test_generateSwift_conditionalPath_wrapsWholeBlock() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/debug", "debugInfo", conditions: ["DEBUG"] ),
+        ] )
+
+        let swift = try generator.generateSwift()
+
+        // The endpoint() call itself must be guarded: a bare call would insert
+        // a route node even when the handler is compiled out.
+        XCTAssertTrue( swift.contains( "        #if DEBUG\n        endpoint( \"/api/debug\" )\n            .get( debugInfo )\n        #endif" ), swift )
+    }
+
+    func test_generateSwift_nestedConditions_areConjoined() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/debug", "debugInfo", conditions: ["DEBUG", "os(Linux)"] ),
+        ] )
+
+        let swift = try generator.generateSwift()
+        XCTAssertTrue( swift.contains( "#if (DEBUG) && (os(Linux))" ), swift )
+    }
+
+    func test_generateSwift_mixedConditions_bindNodeToVariable() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/thing", "list" ),
+            endpoint( ["post"], "/api/thing", "reset", conditions: ["DEBUG"] ),
+        ] )
+
+        let swift = try generator.generateSwift()
+
+        // Unconditional handler keeps the node alive; only the guarded one
+        // sits inside #if.
+        XCTAssertTrue( swift.contains( "let ep1 = endpoint( \"/api/thing\" )" ), swift )
+        XCTAssertTrue( swift.contains( "        ep1.get( list )" ), swift )
+        XCTAssertTrue( swift.contains( "        #if DEBUG\n        ep1.post( reset )\n        #endif" ), swift )
+    }
+
+    func test_generateSwift_exclusiveBranches_guardNodeWithDisjunction() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/info", "linuxInfo", conditions: ["os(Linux)"] ),
+            endpoint( ["get"], "/api/info", "otherInfo", conditions: ["!(os(Linux))"] ),
+        ] )
+
+        let swift = try generator.generateSwift()
+
+        XCTAssertTrue( swift.contains( "        #if (os(Linux)) || (!(os(Linux)))\n        let ep1 = endpoint( \"/api/info\" )" ), swift )
+        XCTAssertTrue( swift.contains( "        #if os(Linux)\n        ep1.get( linuxInfo )\n        #endif" ), swift )
+        XCTAssertTrue( swift.contains( "        #if !(os(Linux))\n        ep1.get( otherInfo )\n        #endif" ), swift )
+    }
+
+    func test_validate_duplicateInExclusiveBranches_isAllowed() {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/info", "a", conditions: ["os(Linux)"] ),
+            endpoint( ["get"], "/api/info", "b", conditions: ["!(os(Linux))"] ),
+        ] )
+
+        XCTAssertNoThrow( try generator.validate() )
+    }
+
+    func test_validate_duplicateWithSameConditions_throws() {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/info", "a", conditions: ["DEBUG"] ),
+            endpoint( ["get"], "/api/info", "b", conditions: ["DEBUG"] ),
+        ] )
+
+        XCTAssertThrowsError( try generator.validate() )
+    }
+
+    func test_validate_conditionalDuplicateOfUnconditional_throws() {
+        // A DEBUG build compiles both handlers, so this is still a conflict.
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/info", "a" ),
+            endpoint( ["get"], "/api/info", "b", conditions: ["DEBUG"] ),
+        ] )
+
+        XCTAssertThrowsError( try generator.validate() )
+    }
+
     func test_generateSwift_extraImports() throws {
         let generator = EndpointFileGenerator( endpoints: [] )
         let swift = try generator.generateSwift( extraImports: ["MyServerLib"] )
@@ -181,6 +318,35 @@ final class EndpointFileGeneratorTests: XCTestCase
         XCTAssertEqual( first?[ "path" ] as? String, "/api/schema/:schema" )
         XCTAssertEqual( first?[ "methods" ] as? [String], ["get", "post"] )
         XCTAssertEqual( first?[ "handler" ] as? String, "SchemaAPI.handle" )
+    }
+
+    func test_generateJSON_containsConditions() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/debug", "debugInfo", conditions: ["DEBUG"] ),
+        ] )
+
+        let json = try generator.generateJSON()
+        let object = try JSONSerialization.jsonObject( with: Data( json.utf8 ) ) as? [String: [[String: Any]]]
+
+        XCTAssertEqual( object?[ "endpoints" ]?.first?[ "conditions" ] as? [String], ["DEBUG"] )
+    }
+
+    func test_endToEnd_ifConfigEndpointStaysGuarded() throws {
+        let result = EndpointScanner().scan( source: """
+        @Endpoint( path: "/api/version" )
+        func versionHandler( context: APIContext ) throws -> Any? { return nil }
+
+        #if DEBUG
+        @Endpoint( [.post], path: "/api/debug/reset" )
+        func resetHandler( context: APIContext ) throws -> Any? { return nil }
+        #endif
+        """, filePath: "Server.swift" )
+
+        XCTAssertFalse( result.hasErrors )
+
+        let swift = try EndpointFileGenerator( endpoints: result.endpoints ).generateSwift()
+        XCTAssertTrue( swift.contains( "        #if DEBUG\n        endpoint( \"/api/debug/reset\" )\n            .post( resetHandler )\n        #endif" ), swift )
+        XCTAssertTrue( swift.contains( ".get( versionHandler )" ), swift )
     }
 
     func test_endToEnd_scanAndGenerate() throws {
