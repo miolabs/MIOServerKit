@@ -21,6 +21,11 @@ public struct ScannedEndpoint: Equatable, Codable
     /// Type of the single context parameter, e.g. "APIContext".
     public let context: String?
     public let isAsync: Bool
+    /// Compilation conditions guarding the handler, outermost #if first.
+    /// An #elseif/#else branch is only active when every previous clause of
+    /// its #if failed, so those entries carry the negations too, e.g.
+    /// "!(os(Linux)) && (os(macOS))". Empty when the handler is unconditional.
+    public let conditions: [String]
     public let file: String
     public let line: Int
 }
@@ -99,6 +104,7 @@ final class EndpointVisitor: SyntaxVisitor
     let filePath: String
     let converter: SourceLocationConverter
     var typeStack: [String] = []
+    var conditionStack: [String] = []
     var result = ScanResult()
 
     init( filePath: String, tree: SourceFileSyntax ) {
@@ -123,6 +129,40 @@ final class EndpointVisitor: SyntaxVisitor
     override func visitPost( _ node: EnumDeclSyntax )      { typeStack.removeLast() }
     override func visitPost( _ node: ActorDeclSyntax )     { typeStack.removeLast() }
     override func visitPost( _ node: ExtensionDeclSyntax ) { typeStack.removeLast() }
+
+    // Track #if nesting so handlers inside conditional compilation blocks are
+    // registered under the same conditions they were compiled with. The tool
+    // never evaluates conditions itself — they are copied verbatim into the
+    // generated file and the compiler resolves them there.
+    override func visit( _ node: IfConfigClauseSyntax ) -> SyntaxVisitorContinueKind {
+        conditionStack.append( effectiveCondition( of: node ) )
+        return .visitChildren
+    }
+
+    override func visitPost( _ node: IfConfigClauseSyntax ) { conditionStack.removeLast() }
+
+    /// The condition under which one clause of an #if block is active. Later
+    /// clauses (#elseif / #else) only apply when every previous clause failed,
+    /// so their conditions are conjoined with the negated earlier ones.
+    func effectiveCondition( of clause: IfConfigClauseSyntax ) -> String
+    {
+        var parts: [String] = []
+
+        if let list = clause.parent?.as( IfConfigClauseListSyntax.self ) {
+            for sibling in list {
+                if sibling.id == clause.id { break }
+                if let condition = sibling.condition {
+                    parts.append( "!(\(condition.trimmedDescription))" )
+                }
+            }
+        }
+
+        if let condition = clause.condition {
+            parts.append( parts.isEmpty ? condition.trimmedDescription : "(\(condition.trimmedDescription))" )
+        }
+
+        return parts.joined( separator: " && " )
+    }
 
     override func visit( _ node: FunctionDeclSyntax ) -> SyntaxVisitorContinueKind
     {
@@ -161,6 +201,7 @@ final class EndpointVisitor: SyntaxVisitor
             handler: handler,
             context: params.first?.type.trimmedDescription,
             isAsync: node.signature.effectSpecifiers?.asyncSpecifier != nil,
+            conditions: conditionStack,
             file: filePath,
             line: line( of: node )
         ) )

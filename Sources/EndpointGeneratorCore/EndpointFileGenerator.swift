@@ -29,7 +29,11 @@ public struct EndpointFileGenerator
         self.endpoints = endpoints
     }
 
-    /// Fails when two handlers claim the same method + path.
+    /// Fails when two handlers claim the same method + path and can be part of
+    /// the same build. Handlers in mutually exclusive #if branches never
+    /// coexist, so they are not duplicates. Two independent conditions
+    /// (#if FLAG_A vs #if FLAG_B) could in theory both be active, but the tool
+    /// cannot prove it either way, so those are allowed too.
     public func validate() throws
     {
         var routes: [String: [ScannedEndpoint]] = [:]
@@ -39,9 +43,23 @@ public struct EndpointFileGenerator
             }
         }
         for (route, handlers) in routes.sorted( by: { $0.key < $1.key } ) where handlers.count > 1 {
-            let parts = route.split( separator: " ", maxSplits: 1 )
-            throw GeneratorError.duplicateRoute( method: String( parts[0] ), path: String( parts[1] ), handlers: handlers )
+            for i in 0 ..< handlers.count {
+                for j in (i + 1) ..< handlers.count where canCoexist( handlers[i].conditions, handlers[j].conditions ) {
+                    let parts = route.split( separator: " ", maxSplits: 1 )
+                    throw GeneratorError.duplicateRoute( method: String( parts[0] ), path: String( parts[1] ), handlers: [ handlers[i], handlers[j] ] )
+                }
+            }
         }
+    }
+
+    /// True when every build that compiles one handler also compiles the
+    /// other, i.e. one condition list is a prefix of the other. Lists that
+    /// diverge at some level (an #if branch vs its #else, or two different
+    /// flags) are treated as non-overlapping.
+    func canCoexist( _ a: [String], _ b: [String] ) -> Bool
+    {
+        let depth = min( a.count, b.count )
+        return Array( a.prefix( depth ) ) == Array( b.prefix( depth ) )
     }
 
     /// Generates the Swift file that registers every endpoint into a Router.
@@ -70,20 +88,57 @@ public struct EndpointFileGenerator
         lines.append( "    {" )
 
         // Group by path: Router.endpoint(path) creates a fresh Endpoint node
-        // each call, so all methods of a path must chain on a single call.
+        // each call, so all methods of a path must go through a single call.
         let byPath = Dictionary( grouping: endpoints, by: { $0.path } )
 
         var first = true
+        var pathIndex = 0
         for path in byPath.keys.sorted() {
+            let group = byPath[ path ]!.sorted( by: { $0.handler < $1.handler } )
+            pathIndex += 1
             if first == false { lines.append( "" ) }
             first = false
 
-            lines.append( "        endpoint( \(quoted( path )) )" )
-            for endpoint in byPath[ path ]!.sorted( by: { $0.handler < $1.handler } ) {
-                for method in endpoint.methods {
-                    lines.append( "            .\(method)( \(endpoint.handler) )" )
+            // Conditions shared by every handler of the path wrap the whole
+            // block, so a compiled-out path never inserts a route node.
+            let common = commonConditionPrefix( of: group )
+            let residuals = group.map { Array( $0.conditions.dropFirst( common.count ) ) }
+
+            if common.isEmpty == false { lines.append( "        #if \(conjunction( common ))" ) }
+
+            if residuals.allSatisfy( { $0.isEmpty } ) {
+                // No per-handler guards: plain chained form.
+                lines.append( "        endpoint( \(quoted( path )) )" )
+                for endpoint in group {
+                    for method in endpoint.methods {
+                        lines.append( "            .\(method)( \(endpoint.handler) )" )
+                    }
                 }
             }
+            else {
+                // Some handlers carry extra #if guards: bind the node to a
+                // variable so guarded registrations can be separate statements.
+                // When every handler is guarded, the node itself is only
+                // created when at least one of them is compiled in.
+                let everyHandlerGuarded = residuals.allSatisfy { $0.isEmpty == false }
+                if everyHandlerGuarded {
+                    lines.append( "        #if \(residuals.map { "(\(conjunction( $0 )))" }.joined( separator: " || " ))" )
+                }
+
+                let variable = "ep\(pathIndex)"
+                lines.append( "        let \(variable) = endpoint( \(quoted( path )) )" )
+                for (endpoint, residual) in zip( group, residuals ) {
+                    if residual.isEmpty == false { lines.append( "        #if \(conjunction( residual ))" ) }
+                    for method in endpoint.methods {
+                        lines.append( "        \(variable).\(method)( \(endpoint.handler) )" )
+                    }
+                    if residual.isEmpty == false { lines.append( "        #endif" ) }
+                }
+
+                if everyHandlerGuarded { lines.append( "        #endif" ) }
+            }
+
+            if common.isEmpty == false { lines.append( "        #endif" ) }
         }
 
         if endpoints.isEmpty == false { lines.append( "" ) }
@@ -105,6 +160,23 @@ public struct EndpointFileGenerator
         let sorted = endpoints.sorted { ( $0.path, $0.handler ) < ( $1.path, $1.handler ) }
         let data = try encoder.encode( [ "endpoints": sorted ] )
         return String( decoding: data, as: UTF8.self ) + "\n"
+    }
+
+    func commonConditionPrefix( of group: [ScannedEndpoint] ) -> [String]
+    {
+        guard var prefix = group.first?.conditions else { return [] }
+        for endpoint in group.dropFirst() {
+            var depth = 0
+            while depth < prefix.count && depth < endpoint.conditions.count && prefix[ depth ] == endpoint.conditions[ depth ] { depth += 1 }
+            prefix = Array( prefix.prefix( depth ) )
+        }
+        return prefix
+    }
+
+    /// Joins nested #if conditions into a single #if-able expression.
+    func conjunction( _ conditions: [String] ) -> String {
+        if conditions.count == 1 { return conditions[0] }
+        return conditions.map { "(\($0))" }.joined( separator: " && " )
     }
 
     func quoted( _ string: String ) -> String {
