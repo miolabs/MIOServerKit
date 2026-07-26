@@ -8,6 +8,7 @@
 
 import Foundation
 import NIOHTTP1
+import MIOCoreLogger
 
 // Single-threaded by construction: created in channelRead, captured into
 // exactly one of {.system, .sync via runIfActive, .async via Task} and
@@ -38,23 +39,59 @@ open class RouterRequest : @unchecked Sendable
         _query_parameters = [:]
     }
     
+    /// Path used when the request-target cannot be parsed as a URL. It is
+    /// deliberately not routable, so such a request is answered with
+    /// "endpoint not found" rather than reaching a handler.
+    static let unparsableTargetPath = "/__mioserverkit_unparsable_request_target__"
+
     public init( _ httpRequestHead: HTTPRequestHead )
     {
         _http_request_head = httpRequestHead
-        _url = URL( string: httpRequestHead.uri )!
-        
-        var qm:[String:String] = [:]
-        let query_params = (_url.query ?? "").components(separatedBy: "&")
-        for p in query_params 
-        {
-            if p.isEmpty { continue }
-            let array = p.components(separatedBy: "=")
-            let key = array[ 0 ]
-            let value = array[ 1 ]
-            qm[ key ] = value
+
+        // A request-target the URL parser rejects must not abort the process:
+        // this runs on an event-loop thread, so a trap here takes the whole
+        // server down for every connection.
+        if let url = URL( string: httpRequestHead.uri ) {
+            _url = url
         }
-        
-        _query_parameters = qm
+        else {
+            Log.error( "Cannot parse request target as a URL: \(httpRequestHead.uri)" )
+            _url = URL( string: RouterRequest.unparsableTargetPath )!
+        }
+
+        _query_parameters = RouterRequest.parseQueryParameters( _url.query )
+    }
+
+    /// Parses a raw query string into key/value pairs.
+    ///
+    /// Splits each pair on its *first* `=` only, so a value may contain `=`
+    /// (`?filter=a=b` yields `a=b`). A parameter with no `=` at all (`?flag`)
+    /// maps to an empty string instead of being a fatal error.
+    ///
+    /// Values are returned exactly as they appear on the wire — they are not
+    /// percent-decoded. Callers that need decoding must do it themselves.
+    static func parseQueryParameters ( _ query: String? ) -> [String:String]
+    {
+        guard let query, query.isEmpty == false else { return [:] }
+
+        var params:[String:String] = [:]
+        for pair in query.components( separatedBy: "&" )
+        {
+            if pair.isEmpty { continue }
+
+            guard let separator = pair.firstIndex( of: "=" ) else {
+                // A valueless parameter such as "?flag".
+                params[ pair ] = ""
+                continue
+            }
+
+            let key = String( pair[ pair.startIndex ..< separator ] )
+            if key.isEmpty { continue }
+
+            params[ key ] = String( pair[ pair.index( after: separator )... ] )
+        }
+
+        return params
     }
     
 

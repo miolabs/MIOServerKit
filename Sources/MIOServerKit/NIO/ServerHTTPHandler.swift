@@ -97,7 +97,16 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
     {
         let path = request.url.relativePath
         var route_vars: RouterPathVars = [:]
-        let method = EndpointMethod( rawValue: request!.method.rawValue )!
+
+        // NIOHTTP1 parses methods this kit has no endpoint type for (TRACE,
+        // CONNECT, PROPFIND, and arbitrary extension methods). Answering 501 is
+        // required rather than merely tidy: force-unwrapping here ran on an
+        // event-loop thread, so a single such request aborted the process.
+        guard let method = EndpointMethod( rawValue: request!.method.rawValue ) else {
+            Log.error( "Unsupported HTTP method: \(request!.method.rawValue) \(path)" )
+            completion( nil, ServerError.general( .notImplemented, "Unsupported HTTP method: \(request!.method.rawValue)" ) )
+            return
+        }
 
         Log.debug( "Endpoint: \(method.rawValue) \(path)" )
         Log.trace( "Headers: \(request.headers)" )
