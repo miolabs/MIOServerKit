@@ -349,6 +349,15 @@ class ServerHTTPHandler: ChannelInboundHandler, RemovableChannelHandler
             let data = err.localizedDescription.data(using: .utf8)!
             self.buffer.writeData(data)
         }
+        // An error that carries its own status: a library with no dependency on
+        // this framework can still say "401", instead of every authentication
+        // failure surfacing as an internal server error.
+        else if let err = error as? MIOHTTPStatusError {
+            response.headers.replaceOrAdd(name: .contentType, value: "text/plain; charset=utf-8")
+            response.status = HTTPResponseStatus( statusCode: err.httpStatusCode )
+            let data = err.localizedDescription.data(using: .utf8)!
+            self.buffer.writeData(data)
+        }
         else {
             response.headers.replaceOrAdd(name: .contentType, value: "text/plain; charset=utf-8")
             response.status = .internalServerError
