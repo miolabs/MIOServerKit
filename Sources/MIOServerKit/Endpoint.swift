@@ -133,7 +133,9 @@ public struct MethodEndpoint
                 return .success( result )
             }
             catch {
-                Log.error( "Synchronous endpoint error: \(error)" )
+                // Naming the endpoint is the whole value of this line: without it a
+                // flood of identical errors says nothing about which route is failing.
+                Log.error( "Synchronous endpoint error: \(request.method) \(request.url.path) — \(error)" )
                 return .failure( error )
             }
         }
@@ -172,7 +174,7 @@ public struct MethodEndpoint
                 return .success( result )
             }
             catch {
-                Log.error( "Asynchronous endpoint error: \(error)" )
+                Log.error( "Asynchronous endpoint error: \(request.method) \(request.url.path) — \(error)" )
                 return .failure( error )
             }
         }
