@@ -29,6 +29,10 @@ import XCTest
 import Foundation
 
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 #if !os(macOS)
 extension MIOServerKitStressTests {
     static var allTests = [
