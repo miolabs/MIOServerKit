@@ -11,6 +11,10 @@ import XCTest
 import Foundation
 
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 #if !os(macOS)
 extension MIOServerKitNIOTests {
     static var allTests = [
@@ -244,13 +248,13 @@ final class MIOServerKitNIOTests: XCTestCase {
 
         let (server, _) = launchServerHttp(routes)
 
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/healthz/", "Str2"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/healthz/", "Str2"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/version"), 200)
         
         routes.endpoint( "/hook").get( httpFuncHandlerStr2 )
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook", "Str2"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook", "Str2"), 200)
 
         try server.terminateServer()
     }
@@ -262,16 +266,16 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/","I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/","I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/version"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/version/"), 200)
         
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/"), 404)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/hook"), 404)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/hook/"), 404)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/"), 404)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/hook"), 404)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/hook/"), 404)
        
         try server.terminateServer()
     }
@@ -282,15 +286,15 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/","I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/hook/version/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/healthz/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/healthz/version"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/healthz/version/debug"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/","I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/version"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/hook/version/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/healthz/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/healthz/version"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/healthz/version/debug"), 200)
        
         try server.terminateServer()
     }
@@ -301,14 +305,14 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update/"), 200)
            
         try server.terminateServer()
     }
@@ -319,17 +323,17 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update/"), 200)
 
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready"), 404)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/ready"), 404)
            
         try server.terminateServer()
     }
@@ -350,23 +354,23 @@ final class MIOServerKitNIOTests: XCTestCase {
         let (server, _) = launchServerHttp(routes)
 
 //        routes.root.debug_info()
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business/update/"), 200)
 
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready/go"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/ready/go/"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/bookings"), 200)
-        XCTAssertEqual(try canonicalPostRequest("http:/localhost:8080/ringr/bookings/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/ready/go"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/ready/go/"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/bookings"), 200)
+        XCTAssertEqual(try canonicalPostRequest("http://localhost:8080/ringr/bookings/"), 200)
            
         try server.terminateServer()
     }
@@ -379,19 +383,19 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/version"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/version/"), 200)
   
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update/"), 200)
         
         try server.terminateServer()
     }
@@ -404,22 +408,22 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/", "I'm Root"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/version/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/", "I'm Root"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/version"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/version/"), 200)
   
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update/"), 200)
 
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/another/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/more/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/more/another/update"), 200)
         
         try server.terminateServer()
     }
@@ -432,17 +436,17 @@ final class MIOServerKitNIOTests: XCTestCase {
         ]
         let (server, _) = launchServerHttp(urls)
         
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/"), 404)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/business-info/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/ringr/bookings/update/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/"), 404)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/business-info/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/ringr/bookings/update/"), 200)
 
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/ready/"), 200)
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/more/another/update"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/more/ready/"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/more/another/update"), 200)
         
         try server.terminateServer()
     }
@@ -456,7 +460,7 @@ final class MIOServerKitNIOTests: XCTestCase {
 
         let (server, _) = launchServerHttp(routes)
 
-        XCTAssertEqual(try canonicalGetRequest("http:/localhost:8080/async"), 200)
+        XCTAssertEqual(try canonicalGetRequest("http://localhost:8080/async"), 200)
 
         try server.terminateServer()
     }
@@ -469,7 +473,7 @@ final class MIOServerKitNIOTests: XCTestCase {
 
         let (server, _) = launchServerHttp(routes)
 
-        XCTAssertEqual(try canonicalHeadRequest("http:/localhost:8080/head"), 200)
+        XCTAssertEqual(try canonicalHeadRequest("http://localhost:8080/head"), 200)
 
         try server.terminateServer()
     }

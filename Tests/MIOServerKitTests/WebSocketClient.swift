@@ -12,6 +12,10 @@
 
 import Foundation
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 // MARK: - URLSession delegate
 
 /// Captures the close event so tests can poll `isClosed()` without

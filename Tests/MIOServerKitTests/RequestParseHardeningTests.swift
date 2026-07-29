@@ -16,6 +16,10 @@
 import XCTest
 import Foundation
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 #if canImport(Glibc)
 import Glibc
 #else
