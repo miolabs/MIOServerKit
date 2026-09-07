@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/miolabs/MIOCore.git",
       "state" : {
-        "branch" : "master",
-        "revision" : "096454bc189360b00b82c1befd5a09ee18ba8297"
+        "revision" : "36494a071aee09489cf7d05a518085759f97edcd",
+        "version" : "2.0.0"
       }
     },
     {
