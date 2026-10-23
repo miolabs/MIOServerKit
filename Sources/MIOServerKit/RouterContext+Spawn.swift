@@ -96,9 +96,10 @@ extension RouterContextProtocol
     // MARK: - The sequence
 
     /// The router's sequence on this context: willExecute, body, didExecute.
-    /// Not public: a context is run once, by the router or by the spawn that
-    /// built it.
-    func run<R> ( _ body: ( Self ) throws -> R ) throws -> R {
+    /// A context runs it once: the router, or the spawn that built it. Public
+    /// for a context built elsewhere (legacy call sites); prefer spawn.
+    @discardableResult
+    public func run<R> ( _ body: ( Self ) throws -> R ) throws -> R {
         try willExecute()
 
         let result: R
