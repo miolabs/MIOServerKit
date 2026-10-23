@@ -24,6 +24,9 @@ public protocol RouterContextProtocol : AnyObject
     var response: RouterResponse { get }
     
     init( _ request: RouterRequest, _ response: RouterResponse, values:[String:Any] ) throws
+
+    // The values a context built from this one starts with (spawn).
+    func sendableValues() -> [String:(any Sendable)]
     
     func queryParam ( _ name: String ) -> String?
     func urlParam<T> ( _ name: String ) throws -> T
