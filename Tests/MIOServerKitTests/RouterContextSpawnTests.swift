@@ -125,16 +125,15 @@ final class RouterContextSpawnTests: XCTestCase {
         XCTAssertTrue( first, "queued" )
         XCTAssertEqual( running.wait( timeout: .now() + 5 ), .success, "runs on its queue" )
 
-        let second = caller.spawn( label: label ) { _ in record( [ "must not run" ] ) }
-        XCTAssertFalse( second, "the label is running: skipped, not queued" )
+        let second_done = expectation( description: "second request ran" )
+        let second = caller.spawn( label: label ) { _ in record( [ "second" ] ); second_done.fulfill() }
+        XCTAssertFalse( second, "the label is running: not started now" )
 
         release.signal()
-        let drained = expectation( description: "queue drained" )
-        MCQueue.named( label ).async { drained.fulfill() }
-        wait( for: [ drained ], timeout: 5 )
+        wait( for: [ second_done ], timeout: 5 )
 
         lock.lock(); let after_first = runs; lock.unlock()
-        XCTAssertEqual( after_first, [ [ "will", "body" ] ], "willExecute before the body; didExecute after, outside what the body records" )
+        XCTAssertEqual( after_first, [ [ "will", "body" ], [ "second" ] ], "willExecute before the body; didExecute after, outside what the body records; the request that arrived mid-run re-ran after it" )
 
         let third = caller.spawn( OtherContext.self, label: label, values: [ "appID": "app-3" ] ) { ctx in
             record( [ ctx.globals[ "schemaID" ] as? String ?? "", ctx.globals[ "appID" ] as? String ?? "" ] )
@@ -157,5 +156,35 @@ final class RouterContextSpawnTests: XCTestCase {
         wait( for: [ drained ], timeout: 5 )
 
         XCTAssertTrue( RouterContext.spawn( OtherContext.self, label: label ) { _ in }, "a failed spawn releases its label" )
+    }
+
+    // The serializer → stock → serializer round trip: the running work itself
+    // triggers a request for its own label before it ends. That request used
+    // to be dropped (label held); now it re-runs once, after the current run.
+    func test_spawn_labelledRequestDuringRunRerunsOnceAfterIt ( ) throws {
+        let label = "spawn-test." + UUID().uuidString
+        let lock = NSLock()
+        var runs = 0
+        let rerun_done = expectation( description: "re-run happened" )
+
+        XCTAssertTrue( RouterContext.spawn( OtherContext.self, label: label ) { _ in
+            lock.lock(); runs += 1; lock.unlock()
+            // Three requests land while we run: one re-run, not three.
+            for _ in 0..<3 {
+                XCTAssertFalse( RouterContext.spawn( OtherContext.self, label: label ) { _ in
+                    lock.lock(); runs += 1; lock.unlock()
+                    rerun_done.fulfill()
+                }, "mid-run requests are deferred, not started" )
+            }
+        } )
+
+        wait( for: [ rerun_done ], timeout: 5 )
+        let drained = expectation( description: "queue drained" )
+        MCQueue.named( label ).async { drained.fulfill() }
+        wait( for: [ drained ], timeout: 5 )
+
+        lock.lock(); let total = runs; lock.unlock()
+        XCTAssertEqual( total, 2, "the first run and exactly one re-run" )
+        XCTAssertTrue( RouterContext.spawn( OtherContext.self, label: label ) { _ in }, "the label is free afterwards" )
     }
 }

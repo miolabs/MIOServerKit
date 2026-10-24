@@ -13,7 +13,10 @@
 //    context.spawn( OtherContext.self ) { ctx in ... }   any RouterContextProtocol type
 //    RouterContext.spawn( OtherContext.self, values: )   no request at all (an event, a timer)
 //  each now, on this thread, returning what the work returns — or later, on
-//  the serial queue of a `label`, one at a time per label.
+//  the serial queue of a `label`, one at a time per label. A labelled spawn
+//  that arrives while its label is running is not lost: it re-runs once the
+//  running work ends (the last request wins), so a wake-up that lands
+//  mid-run is still served.
 //
 
 import Foundation
@@ -26,6 +29,32 @@ import MIOCoreLogger
 /// throws, before rethrowing; didExecute never runs for that work.
 public protocol ExecutionRollback {
     func rollbackExecution ( )
+}
+
+
+/// The labelled spawns that arrived while their label was running: the last
+/// request per label, re-spawned when the running work ends.
+///
+/// Without it such a request was dropped, and the running work was expected
+/// to pick its state up — which it cannot when the request lands after its
+/// last look. The serializer wakes the stock server from inside its own run;
+/// the stock server writes and wakes the serializer back within milliseconds;
+/// that awake found the label held and was lost, and the rows waited for the
+/// next unrelated awake.
+enum SpawnPending
+{
+    nonisolated(unsafe) private static var requests: [String: () -> Void] = [:]
+    private static let lock = NSLock()
+
+    static func set ( _ label: String, _ request: @escaping () -> Void ) {
+        lock.lock(); defer { lock.unlock() }
+        requests[ label ] = request
+    }
+
+    static func take ( _ label: String ) -> ( () -> Void )? {
+        lock.lock(); defer { lock.unlock() }
+        return requests.removeValue( forKey: label )
+    }
 }
 
 
@@ -56,26 +85,41 @@ extension RouterContextProtocol
     // MARK: - Later, on the label's queue
 
     /// Builds the context and runs `body` on the serial queue of `label`, one
-    /// at a time per label: when the label is already running, nothing is
-    /// queued and the call returns false (the running work picks the new
-    /// state up). The context is built on the queue, never crossing threads.
-    /// A failure is logged with the label; the work itself reports its own.
+    /// at a time per label. When the label is already running the call
+    /// returns false and the request waits: it re-runs, with its own context,
+    /// once the running work ends — one re-run however many requests arrived
+    /// meanwhile, the last one's body and values. The context is built on
+    /// the queue, never crossing threads. A failure is logged with the label;
+    /// the work itself reports its own.
     @discardableResult
     public static func spawn<C: RouterContextProtocol> ( _ type: C.Type, label: String, values: [String:(any Sendable)] = [:], _ body: @Sendable @escaping ( C ) throws -> Void ) -> Bool {
         guard MCQueue.acquire( label ) else {
-            Log.debug( "\(label): already running, spawn skipped" )
+            SpawnPending.set( label ) { spawn( type, label: label, values: values, body ) }
+            Log.debug( "\(label): already running, spawn re-runs when it ends" )
+
+            // The running work may have released between the failed acquire
+            // and the set, leaving no one to take the request. A second
+            // acquire settles it: still held, the runner takes it on exit;
+            // free, we hold the label now and run the pending request.
+            if MCQueue.acquire( label ) {
+                MCQueue.release( label )
+                SpawnPending.take( label )?( )
+            }
             return false
         }
 
         MCQueue.named( label ).async {
-            defer { MCQueue.release( label ) }
-
             do {
                 try spawn( type, values: values, body )
             }
             catch {
                 Log.error( "\(label): spawned work failed: \(error)" )
             }
+
+            // Release first, then look for a request that arrived meanwhile:
+            // its re-spawn acquires the label afresh.
+            MCQueue.release( label )
+            SpawnPending.take( label )?( )
         }
 
         return true
