@@ -37,6 +37,9 @@ open class NIOServer: Server
     /// sinks should compose their own observer that forwards to each.
     weak var observer: ServerObserver? = nil
 
+    /// gzip/deflate for HTTP responses. On by default; set before `run(port:)`.
+    public var responseCompression: ResponseCompressionOptions = .default
+
     /// Default-empty `webSocketEndpoints` keeps every existing call site
     /// (`NIOServer(routes: r)`) source-compatible. The parent `Server`
     /// declares only `init(routes:)`; this designated init shadows it.
@@ -120,6 +123,10 @@ open class NIOServer: Server
     /// as `HTTPServerRequestPart`.
     private static let httpHandlerName = "MSK.ServerHTTPHandler"
 
+    /// Name of the response compressor. It is an HTTP-level handler too, so
+    /// the WebSocket upgrade closure removes it the same way.
+    private static let compressorHandlerName = "MSK.ResponseCompressor"
+
     func childChannelInitializer(channel: Channel) -> EventLoopFuture<Void> {
         // Capture references locally so the upgrader closures (which run
         // on the channel's event loop) don't have to retain `self`.
@@ -163,6 +170,14 @@ open class NIOServer: Server
                     Log.error( "WS removeHandler(\(NIOServer.httpHandlerName)) failed: \(error)" )
                 }
                 return removed.flatMap {
+                    // The compressor (when installed) speaks HTTP parts only; drop it too.
+                    channel.pipeline.context( name: NIOServer.compressorHandlerName )
+                        .flatMap { channel.pipeline.removeHandler( context: $0 ) }
+                        .flatMapErrorThrowing { error in
+                            if case ChannelPipelineError.notFound = error { return }
+                            throw error
+                        }
+                }.flatMap {
                     let clientId = UUID().uuidString
                     guard let connection = catalog.addClient(
                         head.uri, clientId, channel.allocator, channel
@@ -190,6 +205,14 @@ open class NIOServer: Server
             withServerUpgrade: upgradeConfig,
             withErrorHandling: true
         ).flatMap {
+            // Compressor sits between NIO's response encoder and our handler,
+            // so every response we write passes through it.
+            guard self.responseCompression.enabled else { return channel.eventLoop.makeSucceededVoidFuture() }
+            return channel.pipeline.addHandler(
+                self.responseCompression.makeHandler(),
+                name: NIOServer.compressorHandlerName
+            )
+        }.flatMap {
             // The HTTP handler runs only on non-upgraded connections.
             // Named so the upgrade closure can locate and remove it.
             channel.pipeline.addHandler(
