@@ -252,4 +252,66 @@ final class RouterTests: XCTestCase {
         XCTAssertTrue( routes.root.match( RouterPath( base + "/1234" ), &route_vars ) === route_var )
     }
 
+// MARK: - Route patterns
+
+    func testRoutePatternUUIDIsTheSameNodeAsUUIDRegexRoute ( ) {
+        // An @Endpoint route (":scheme{uuid}" -> RoutePattern.uuid) and a
+        // hand-written one (uuidRegexRoute) must share the route node.
+        let routes = Router()
+
+        let route_1 = routes.endpoint( "/api/entity/:scheme\(uuidRegexRoute)/one").get( nop )
+        let route_2 = routes.endpoint( "/api/entity/:scheme\(RoutePattern.uuid)/two").get( nop )
+
+        let base = "/api/entity/48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F"
+
+        var route_vars: RouterPathVars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/one" ), &route_vars ) === route_1 )
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/two" ), &route_vars ) === route_2 )
+        XCTAssertEqual( route_vars[ "scheme" ], "48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F" )
+        XCTAssertNil( routes.root.match( RouterPath( "/api/entity/not-a-uuid/one" ), &route_vars ) )
+    }
+
+    func testRoutePatternDefaults ( ) {
+        // Each pattern accepts its values, and only those (the regex must match the whole segment).
+        let cases: [ ( pattern: String, good: [String], bad: [String] ) ] = [
+            ( RoutePattern.uuid,   [ "48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F", "48d3c8b3-0f4b-4e8e-9d55-0a1b2c3d4e5f" ], [ "48D3C8B3", "not-a-uuid" ] ),
+            ( RoutePattern.int,    [ "0", "42", "-1" ],                    [ "4.2", "42a", "a42", "-" ] ),
+            ( RoutePattern.number, [ "0", "42", "-1", "12.50", "-0.5" ],   [ "12.", ".5", "1.2.3", "12a" ] ),
+            ( RoutePattern.date,   [ "2026-11-18" ],                       [ "2026-11-1", "18-11-2026", "2026-11-18T10:00", "20261118" ] ),
+            ( RoutePattern.time,   [ "21:30", "21:30:00" ],                [ "2130", "21:3", "21:30:0", "21:30:00:00" ] ),
+        ]
+
+        for c in cases {
+            let routes = Router()
+            let route = routes.endpoint( "/api/value/:value\(c.pattern)/info" ).get( nop )
+
+            for value in c.good {
+                var route_vars: RouterPathVars = [:]
+                XCTAssertTrue( routes.root.match( RouterPath( "/api/value/\(value)/info" ), &route_vars ) === route, "\(c.pattern) should accept \(value)" )
+                XCTAssertEqual( route_vars[ "value" ], value )
+            }
+            for value in c.bad {
+                var route_vars: RouterPathVars = [:]
+                XCTAssertNil( routes.root.match( RouterPath( "/api/value/\(value)/info" ), &route_vars ), "\(c.pattern) should reject \(value)" )
+            }
+        }
+    }
+
+    func testRoutePatternDeclaredByTheApp ( ) {
+        let routes = Router()
+
+        let route_page = routes.endpoint( "/api/page/:page\(RoutePattern.testSlug)").get( nop )
+
+        var route_vars: RouterPathVars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( "/api/page/summer-menu-2026" ), &route_vars ) === route_page )
+        XCTAssertEqual( route_vars[ "page" ], "summer-menu-2026" )
+        XCTAssertNil( routes.root.match( RouterPath( "/api/page/Summer_Menu" ), &route_vars ) )
+    }
+
+}
+
+// What an app does to add a pattern of its own: ":name{testSlug}" in an @Endpoint path.
+extension RoutePattern
+{
+    static let testSlug = "([a-z0-9-]+)"
 }

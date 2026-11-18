@@ -26,7 +26,6 @@ public struct EndpointAnnotation: Equatable
         case invalidPath
         case unsupportedMethod(String)
         case emptyMethods
-        case unknownPathPattern(String)
 
         public var description: String {
             switch self {
@@ -34,7 +33,6 @@ public struct EndpointAnnotation: Equatable
             case .invalidPath:                  return "@Endpoint path must be a plain string literal (no interpolation)"
             case .unsupportedMethod(let m):     return "@Endpoint does not support method '.\(m)'. Supported: \(supportedMethods.map { ".\($0)" }.joined(separator: ", "))"
             case .emptyMethods:                 return "@Endpoint methods array cannot be empty"
-            case .unknownPathPattern(let p):    return "@Endpoint path uses unknown path pattern '\(p)'. Supported: \(EndpointPathPattern.known.keys.sorted().map { "{\($0)}" }.joined(separator: ", "))"
             }
         }
 
@@ -85,10 +83,6 @@ public struct EndpointAnnotation: Equatable
 
         guard let p = path, p.isEmpty == false else { throw ParseError.missingPath }
 
-        for case .pattern( let name ) in EndpointPathPattern.split( p ) where EndpointPathPattern.known[ name ] == nil {
-            throw ParseError.unknownPathPattern( name )
-        }
-
         return EndpointAnnotation( methods: methods.isEmpty ? ["get"] : methods, path: p )
     }
 
@@ -107,15 +101,20 @@ public struct EndpointAnnotation: Equatable
 ///
 /// An @Endpoint path must be a plain string literal, so it cannot interpolate
 /// the regex constants a hand-written route uses (`":scheme\(uuidRegexRoute)"`).
-/// A pattern name stands for one of those constants: the generated file emits
-/// the very same interpolation, so an annotated route and a hand-written one
-/// resolve to the same route node and the regex keeps a single definition.
+/// A pattern name stands for a static member of MIOServerKit's `RoutePattern`:
+/// `{uuid}` is generated as `\(RoutePattern.uuid)`.
+///
+/// The set of patterns is open. The tool keeps no list of names: an app (or a
+/// library it uses) adds its own with a plain extension,
+///
+///     extension RoutePattern { static let slug = "([a-z0-9-]+)" }
+///
+/// and `:page{slug}` works. A name nobody declared fails the build of the
+/// generated file ("type 'RoutePattern' has no member ...").
 public enum EndpointPathPattern
 {
-    /// Pattern name -> the Swift constant (declared in MIOServerKit) it expands to.
-    public static let known: [String: String] = [
-        "uuid": "uuidRegexRoute",
-    ]
+    /// The type whose static members the pattern names refer to.
+    public static let namespace = "RoutePattern"
 
     public enum Piece: Equatable
     {

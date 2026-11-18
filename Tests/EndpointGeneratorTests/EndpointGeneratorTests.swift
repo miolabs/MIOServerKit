@@ -190,15 +190,16 @@ final class EndpointScannerTests: XCTestCase
         XCTAssertEqual( result.endpoints.first?.path, "/api/entity/:scheme{uuid}/Booking/:booking_id{uuid}?" )
     }
 
-    func test_scan_unknownPathPattern_isAnError() {
+    func test_scan_appDefinedPathPattern_isAccepted() {
+        // The tool keeps no list of pattern names: {slug} is whatever the app
+        // declares in an extension of RoutePattern.
         let result = scan( """
-        @Endpoint( path: "/api/entity/:scheme{guid}" )
-        func broken( context: APIContext ) throws -> Any? { return nil }
+        @Endpoint( path: "/api/page/:page{slug}" )
+        func page( context: APIContext ) throws -> Any? { return nil }
         """ )
 
-        XCTAssertTrue( result.endpoints.isEmpty )
-        XCTAssertTrue( result.hasErrors )
-        XCTAssertTrue( result.diagnostics.first?.message.contains( "unknown path pattern 'guid'" ) ?? false, "\(result.diagnostics)" )
+        XCTAssertTrue( result.diagnostics.isEmpty, "\(result.diagnostics)" )
+        XCTAssertEqual( result.endpoints.first?.path, "/api/page/:page{slug}" )
     }
 
     func test_scan_inlineRegexQuantifier_isNotAPathPattern() {
@@ -404,7 +405,7 @@ final class EndpointFileGeneratorTests: XCTestCase
 
     // MARK: - Path patterns ( :name{uuid} )
 
-    func test_generateSwift_pathPattern_expandsToTheRouterConstant() throws {
+    func test_generateSwift_pathPattern_expandsToRoutePatternMember() throws {
         let generator = EndpointFileGenerator( endpoints: [
             endpoint( ["get"], "/api/entity/:scheme{uuid}/Booking/:booking_id{uuid}?", "booking" ),
         ] )
@@ -412,8 +413,18 @@ final class EndpointFileGeneratorTests: XCTestCase
         let swift = try generator.generateSwift()
 
         // Same spelling a hand-written route uses, so both land on the same route node.
-        XCTAssertTrue( swift.contains( #"endpoint( "/api/entity/:scheme\(uuidRegexRoute)/Booking/:booking_id\(uuidRegexRoute)?" )"# ), swift )
+        XCTAssertTrue( swift.contains( #"endpoint( "/api/entity/:scheme\(RoutePattern.uuid)/Booking/:booking_id\(RoutePattern.uuid)?" )"# ), swift )
         XCTAssertFalse( swift.contains( "{uuid}" ), swift )
+    }
+
+    func test_generateSwift_appDefinedPathPattern_expandsToRoutePatternMember() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/page/:page{slug}/:size{page_size}?", "page" ),
+        ] )
+
+        let swift = try generator.generateSwift()
+
+        XCTAssertTrue( swift.contains( #"endpoint( "/api/page/:page\(RoutePattern.slug)/:size\(RoutePattern.page_size)?" )"# ), swift )
     }
 
     func test_generateSwift_inlineRegex_isEscapedNotExpanded() throws {
@@ -443,7 +454,7 @@ final class EndpointFileGeneratorTests: XCTestCase
         XCTAssertFalse( result.hasErrors, "\(result.diagnostics)" )
 
         let swift = try EndpointFileGenerator( endpoints: result.endpoints ).generateSwift()
-        XCTAssertTrue( swift.contains( #"endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/insert" )"# ), swift )
+        XCTAssertTrue( swift.contains( #"endpoint( "/booking/schema/:scheme\(RoutePattern.uuid)/insert" )"# ), swift )
         XCTAssertTrue( swift.contains( ".put( add_booking_handler )" ), swift )
     }
 }

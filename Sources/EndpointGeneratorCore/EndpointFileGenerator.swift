@@ -190,12 +190,12 @@ public struct EndpointFileGenerator
     }
 
     /// The path as a Swift string literal, with every `{pattern}` replaced by
-    /// the interpolation of its constant: `:scheme{uuid}` -> `:scheme\(uuidRegexRoute)`.
+    /// the interpolation of its RoutePattern member: `:scheme{uuid}` -> `:scheme\(RoutePattern.uuid)`.
     func pathLiteral( _ path: String ) -> String {
         let body = EndpointPathPattern.split( path ).map { piece -> String in
             switch piece {
             case .text( let text ):    return escaped( text )
-            case .pattern( let name ): return EndpointPathPattern.known[ name ].map { "\\(\($0))" } ?? escaped( "{\(name)}" )
+            case .pattern( let name ): return "\\(\(EndpointPathPattern.namespace).\(name))"
             }
         }
         return "\"\(body.joined())\""

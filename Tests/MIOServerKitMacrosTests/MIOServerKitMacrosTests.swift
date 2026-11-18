@@ -135,22 +135,19 @@ final class MIOServerKitMacrosTests: XCTestCase
         )
     }
 
-    func testEndpointMacro_unknownPathPattern_emitsError() throws {
+    func testEndpointMacro_appDefinedPathPattern_expandsToNothing() throws {
         assertMacroExpansion(
             """
-            @Endpoint( path: "/api/entity/:scheme{guid}" )
-            func entityHandler( context: APIContext ) throws -> Any? {
+            @Endpoint( path: "/api/page/:page{slug}" )
+            func pageHandler( context: APIContext ) throws -> Any? {
                 return nil
             }
             """,
             expandedSource: """
-            func entityHandler( context: APIContext ) throws -> Any? {
+            func pageHandler( context: APIContext ) throws -> Any? {
                 return nil
             }
             """,
-            diagnostics: [
-                DiagnosticSpec( message: "@Endpoint path uses unknown path pattern 'guid'. Supported: {uuid}", line: 1, column: 1 )
-            ],
             macros: testMacros
         )
     }
