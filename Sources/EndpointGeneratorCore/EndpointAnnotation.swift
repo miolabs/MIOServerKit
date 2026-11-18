@@ -95,3 +95,69 @@ public struct EndpointAnnotation: Equatable
         return segment.content.text
     }
 }
+
+
+/// Named patterns for path variables: `:scheme{uuid}`.
+///
+/// An @Endpoint path must be a plain string literal, so it cannot interpolate
+/// the regex constants a hand-written route uses (`":scheme\(uuidRegexRoute)"`).
+/// A pattern name stands for a static member of MIOServerKit's `RoutePattern`:
+/// `{uuid}` is generated as `\(RoutePattern.uuid)`.
+///
+/// The set of patterns is open. The tool keeps no list of names: an app (or a
+/// library it uses) adds its own with a plain extension,
+///
+///     extension RoutePattern { static let slug = "([a-z0-9-]+)" }
+///
+/// and `:page{slug}` works. A name nobody declared fails the build of the
+/// generated file ("type 'RoutePattern' has no member ...").
+public enum EndpointPathPattern
+{
+    /// The type whose static members the pattern names refer to.
+    public static let namespace = "RoutePattern"
+
+    public enum Piece: Equatable
+    {
+        case text(String)
+        case pattern(String)
+    }
+
+    /// Splits a path into literal text and pattern names. A pattern is a
+    /// `{name}` that comes right after a variable name (`:scheme{uuid}`);
+    /// braces anywhere else, such as a `{8}` quantifier of an inline regex
+    /// (`:code([0-9a-f]{8})`), are plain text.
+    public static func split( _ path: String ) -> [Piece]
+    {
+        var pieces: [Piece] = []
+        var text = ""
+        var inVarName = false   // between the ':' of a variable and the end of its name
+
+        func isNameChar( _ c: Character ) -> Bool { return c.isLetter || c.isNumber || c == "_" }
+
+        var index = path.startIndex
+        while index < path.endIndex {
+            let c = path[ index ]
+
+            if c == "{", inVarName,
+               let close = path[ index... ].firstIndex( of: "}" ) {
+                let name = String( path[ path.index( after: index ) ..< close ] )
+                if name.isEmpty == false && name.allSatisfy( isNameChar ) && name.first!.isNumber == false {
+                    if text.isEmpty == false { pieces.append( .text( text ) ); text = "" }
+                    pieces.append( .pattern( name ) )
+                    index = path.index( after: close )
+                    inVarName = false
+                    continue
+                }
+            }
+
+            if c == ":" { inVarName = true }
+            else if isNameChar( c ) == false { inVarName = false }
+
+            text.append( c )
+            index = path.index( after: index )
+        }
+
+        if text.isEmpty == false { pieces.append( .text( text ) ) }
+        return pieces
+    }
+}

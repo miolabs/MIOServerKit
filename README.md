@@ -165,6 +165,41 @@ class EntityAPI {
 }
 ```
 
+A path must be a plain string literal, so it cannot interpolate a regex constant the way a hand-written route does. Use a named pattern after the variable name instead:
+
+```swift
+// Same route as router.endpoint( "/api/entity/:scheme\(RoutePattern.uuid)/Booking/:id\(RoutePattern.uuid)?" )
+@Endpoint( path: "/api/entity/:scheme{uuid}/Booking/:id{uuid}?" )
+func bookingHandler( context: RouterContext ) throws -> (any Sendable)? { return nil }
+```
+
+`{name}` refers to a static member of `RoutePattern`; the generated file writes it as `\(RoutePattern.name)`. MIOServerKit ships the common ones:
+
+| Pattern | Accepts | Example |
+|---|---|---|
+| `{uuid}` | UUID (same regex as `uuidRegexRoute`) | `48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F` |
+| `{int}` | whole number, optionally negative | `42`, `-1` |
+| `{number}` | decimal number, optionally negative | `12.50` |
+| `{date}` | calendar day, `yyyy-MM-dd` | `2026-11-18` |
+| `{time}` | time of day, `HH:mm` or `HH:mm:ss` | `21:30` |
+
+A pattern checks the shape of the segment only (`2026-13-45` passes `{date}`); the handler still parses the value. Because `{uuid}` is the same regex as `uuidRegexRoute`, annotated and hand-written routes share the route node and a server can be migrated a few routes at a time.
+
+The tool has no list of names, so an app or a library adds its own with an extension:
+
+```swift
+extension RoutePattern {
+    static let slug = "([a-z0-9-]+)"     // the regex in parentheses, as it follows the variable name
+}
+
+@Endpoint( path: "/api/page/:name{slug}" )
+func pageHandler( context: RouterContext ) throws -> (any Sendable)? { return nil }
+```
+
+A name nobody declared fails the build of the generated file with "type 'RoutePattern' has no member ...".
+
+Routes are registered sorted by path. Order does not affect matching: a literal segment always wins over a variable at the same position.
+
 The macro itself is a compile-time validator only — Swift compiler plugins run inside a sandbox and cannot write files. The actual route registration file is produced by the `generate-endpoints` tool, which runs as a **pre-build step**. It parses all Swift sources with swift-syntax, collects every `@Endpoint` annotation and writes `Endpoints+Generated.swift`:
 
 ```bash

@@ -118,6 +118,40 @@ final class MIOServerKitMacrosTests: XCTestCase
         )
     }
 
+    func testEndpointMacro_pathPattern_expandsToNothing() throws {
+        assertMacroExpansion(
+            """
+            @Endpoint( path: "/api/entity/:scheme{uuid}" )
+            func entityHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            expandedSource: """
+            func entityHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
+    func testEndpointMacro_appDefinedPathPattern_expandsToNothing() throws {
+        assertMacroExpansion(
+            """
+            @Endpoint( path: "/api/page/:page{slug}" )
+            func pageHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            expandedSource: """
+            func pageHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
     func testEndpointMacro_onClass_emitsError() throws {
         assertMacroExpansion(
             """

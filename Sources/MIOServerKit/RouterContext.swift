@@ -17,6 +17,31 @@ import Glibc
 
 public let uuidRegexRoute = "([0-9a-fA-F]{8}-[0-96a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 
+/// Named regex constraints for path variables.
+///
+/// `"/entity/:id\(RoutePattern.uuid)"` in a hand-written route, or
+/// `"/entity/:id{uuid}"` in an `@Endpoint` path (the generated registration
+/// file turns `{name}` into `\(RoutePattern.name)`).
+///
+/// Add your own patterns with an extension, in the app or in a library:
+///
+///     extension RoutePattern { static let slug = "([a-z0-9-]+)" }
+///
+/// A pattern is the regex in parentheses, exactly as it follows the variable name.
+public enum RoutePattern
+{
+    /// 48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F
+    public static let uuid   = uuidRegexRoute
+    /// Whole number, optionally negative: 42, -1
+    public static let int    = "(-?[0-9]+)"
+    /// Decimal number, optionally negative: 42, -1, 12.50
+    public static let number = "(-?[0-9]+(?:\\.[0-9]+)?)"
+    /// Calendar day, yyyy-MM-dd: 2026-11-18
+    public static let date   = "([0-9]{4}-[0-9]{2}-[0-9]{2})"
+    /// Time of day, HH:mm or HH:mm:ss: 21:30, 21:30:00
+    public static let time   = "([0-9]{2}:[0-9]{2}(?::[0-9]{2})?)"
+}
+
 
 public protocol RouterContextProtocol : AnyObject
 {
