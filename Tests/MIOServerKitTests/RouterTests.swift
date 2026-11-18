@@ -207,4 +207,49 @@ final class RouterTests: XCTestCase {
         XCTAssertTrue(routes.root.match( RouterPath( "/more/another/info"), &route_vars ) === route_2 )
     }
 
+// MARK: - Literal vs variable segments
+
+    // generate-endpoints registers the routes sorted by path, so a variable
+    // segment (":booking_id") is registered BEFORE its literal siblings
+    // ("event-registration"). The literal must still win.
+    func testRouterLiteralWinsOverVarRegisteredFirst ( ) {
+        let routes = Router()
+
+        let route_var = routes.endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/:booking_id").put( nop )
+        let route_lit = routes.endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/event-registration").put( nop )
+        let route_sub = routes.endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/:booking_id/confirm").get( nop )
+        let route_ev  = routes.endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/events/reserve").put( nop )
+
+        let base = "/booking/schema/48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F"
+
+        var route_vars: RouterPathVars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/event-registration" ), &route_vars ) === route_lit )
+        XCTAssertNil( route_vars[ "booking_id" ] )
+
+        route_vars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/events/reserve" ), &route_vars ) === route_ev )
+
+        route_vars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/1234" ), &route_vars ) === route_var )
+        XCTAssertEqual( route_vars[ "booking_id" ], "1234" )
+
+        route_vars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/1234/confirm" ), &route_vars ) === route_sub )
+        XCTAssertEqual( route_vars[ "booking_id" ], "1234" )
+    }
+
+    func testRouterLiteralWinsOverVarRegisteredLast ( ) {
+        let routes = Router()
+
+        let route_lit = routes.endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/event-registration").put( nop )
+        let route_var = routes.endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/:booking_id").put( nop )
+
+        let base = "/booking/schema/48D3C8B3-0F4B-4E8E-9D55-0A1B2C3D4E5F"
+
+        var route_vars: RouterPathVars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/event-registration" ), &route_vars ) === route_lit )
+        route_vars = [:]
+        XCTAssertTrue( routes.root.match( RouterPath( base + "/1234" ), &route_vars ) === route_var )
+    }
+
 }

@@ -118,6 +118,43 @@ final class MIOServerKitMacrosTests: XCTestCase
         )
     }
 
+    func testEndpointMacro_pathPattern_expandsToNothing() throws {
+        assertMacroExpansion(
+            """
+            @Endpoint( path: "/api/entity/:scheme{uuid}" )
+            func entityHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            expandedSource: """
+            func entityHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            macros: testMacros
+        )
+    }
+
+    func testEndpointMacro_unknownPathPattern_emitsError() throws {
+        assertMacroExpansion(
+            """
+            @Endpoint( path: "/api/entity/:scheme{guid}" )
+            func entityHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            expandedSource: """
+            func entityHandler( context: APIContext ) throws -> Any? {
+                return nil
+            }
+            """,
+            diagnostics: [
+                DiagnosticSpec( message: "@Endpoint path uses unknown path pattern 'guid'. Supported: {uuid}", line: 1, column: 1 )
+            ],
+            macros: testMacros
+        )
+    }
+
     func testEndpointMacro_onClass_emitsError() throws {
         assertMacroExpansion(
             """

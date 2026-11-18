@@ -176,6 +176,41 @@ final class EndpointScannerTests: XCTestCase
         XCTAssertTrue( result.endpoints.isEmpty )
         XCTAssertTrue( result.diagnostics.isEmpty )
     }
+
+    // MARK: - Path patterns ( :name{uuid} )
+
+    func test_scan_pathPattern_isAccepted() {
+        let result = scan( """
+        @Endpoint( path: "/api/entity/:scheme{uuid}/Booking/:booking_id{uuid}?" )
+        func booking( context: APIContext ) throws -> Any? { return nil }
+        """ )
+
+        XCTAssertTrue( result.diagnostics.isEmpty, "\(result.diagnostics)" )
+        // The annotation spelling is kept: it is what the JSON description shows.
+        XCTAssertEqual( result.endpoints.first?.path, "/api/entity/:scheme{uuid}/Booking/:booking_id{uuid}?" )
+    }
+
+    func test_scan_unknownPathPattern_isAnError() {
+        let result = scan( """
+        @Endpoint( path: "/api/entity/:scheme{guid}" )
+        func broken( context: APIContext ) throws -> Any? { return nil }
+        """ )
+
+        XCTAssertTrue( result.endpoints.isEmpty )
+        XCTAssertTrue( result.hasErrors )
+        XCTAssertTrue( result.diagnostics.first?.message.contains( "unknown path pattern 'guid'" ) ?? false, "\(result.diagnostics)" )
+    }
+
+    func test_scan_inlineRegexQuantifier_isNotAPathPattern() {
+        // {8} here is a regex quantifier inside an inline constraint, not a pattern name.
+        let result = scan( """
+        @Endpoint( path: "/api/code/:code([0-9a-f]{8})" )
+        func code( context: APIContext ) throws -> Any? { return nil }
+        """ )
+
+        XCTAssertTrue( result.diagnostics.isEmpty, "\(result.diagnostics)" )
+        XCTAssertEqual( result.endpoints.first?.path, "/api/code/:code([0-9a-f]{8})" )
+    }
 }
 
 final class EndpointFileGeneratorTests: XCTestCase
@@ -365,5 +400,50 @@ final class EndpointFileGeneratorTests: XCTestCase
         XCTAssertTrue( swift.contains( ".get( schemaHandler )" ) )
         XCTAssertTrue( swift.contains( ".post( schemaHandler )" ) )
         XCTAssertTrue( swift.contains( ".get( versionHandler )" ) )
+    }
+
+    // MARK: - Path patterns ( :name{uuid} )
+
+    func test_generateSwift_pathPattern_expandsToTheRouterConstant() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/entity/:scheme{uuid}/Booking/:booking_id{uuid}?", "booking" ),
+        ] )
+
+        let swift = try generator.generateSwift()
+
+        // Same spelling a hand-written route uses, so both land on the same route node.
+        XCTAssertTrue( swift.contains( #"endpoint( "/api/entity/:scheme\(uuidRegexRoute)/Booking/:booking_id\(uuidRegexRoute)?" )"# ), swift )
+        XCTAssertFalse( swift.contains( "{uuid}" ), swift )
+    }
+
+    func test_generateSwift_inlineRegex_isEscapedNotExpanded() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], #"/api/code/:code([0-9a-f]{8}\d)"#, "code" ),
+        ] )
+
+        let swift = try generator.generateSwift()
+
+        XCTAssertTrue( swift.contains( #"endpoint( "/api/code/:code([0-9a-f]{8}\\d)" )"# ), swift )
+    }
+
+    func test_generateJSON_keepsThePathPatternSpelling() throws {
+        let generator = EndpointFileGenerator( endpoints: [
+            endpoint( ["get"], "/api/entity/:scheme{uuid}", "entity" ),
+        ] )
+
+        XCTAssertTrue( try generator.generateJSON().contains( ":scheme{uuid}" ) )
+    }
+
+    func test_endToEnd_pathPattern() throws {
+        let result = EndpointScanner().scan( source: """
+        @Endpoint( [.put], path: "/booking/schema/:scheme{uuid}/insert" )
+        func add_booking_handler( context: EntityContext ) throws -> [String:Any] { return [:] }
+        """, filePath: "Server.swift" )
+
+        XCTAssertFalse( result.hasErrors, "\(result.diagnostics)" )
+
+        let swift = try EndpointFileGenerator( endpoints: result.endpoints ).generateSwift()
+        XCTAssertTrue( swift.contains( #"endpoint( "/booking/schema/:scheme\(uuidRegexRoute)/insert" )"# ), swift )
+        XCTAssertTrue( swift.contains( ".put( add_booking_handler )" ), swift )
     }
 }

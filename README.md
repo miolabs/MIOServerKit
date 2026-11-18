@@ -165,6 +165,18 @@ class EntityAPI {
 }
 ```
 
+A path must be a plain string literal, so it cannot interpolate a regex constant the way a hand-written route does. Use a named pattern after the variable name instead:
+
+```swift
+// Same route as router.endpoint( "/api/entity/:scheme\(uuidRegexRoute)/Booking/:id\(uuidRegexRoute)?" )
+@Endpoint( path: "/api/entity/:scheme{uuid}/Booking/:id{uuid}?" )
+func bookingHandler( context: RouterContext ) throws -> (any Sendable)? { return nil }
+```
+
+The generated file expands `{uuid}` to `\(uuidRegexRoute)`, so annotated and hand-written routes share the same route node and a server can be migrated a few routes at a time. An unknown pattern name is a compile error. `uuid` is the only pattern today; new ones are added in `EndpointPathPattern.known`.
+
+Routes are registered sorted by path. Order does not affect matching: a literal segment always wins over a variable at the same position.
+
 The macro itself is a compile-time validator only — Swift compiler plugins run inside a sandbox and cannot write files. The actual route registration file is produced by the `generate-endpoints` tool, which runs as a **pre-build step**. It parses all Swift sources with swift-syntax, collects every `@Endpoint` annotation and writes `Endpoints+Generated.swift`:
 
 ```bash

@@ -108,7 +108,7 @@ public struct EndpointFileGenerator
 
             if residuals.allSatisfy( { $0.isEmpty } ) {
                 // No per-handler guards: plain chained form.
-                lines.append( "        endpoint( \(quoted( path )) )" )
+                lines.append( "        endpoint( \(pathLiteral( path )) )" )
                 for endpoint in group {
                     for method in endpoint.methods {
                         lines.append( "            .\(method)( \(endpoint.handler) )" )
@@ -126,7 +126,7 @@ public struct EndpointFileGenerator
                 }
 
                 let variable = "ep\(pathIndex)"
-                lines.append( "        let \(variable) = endpoint( \(quoted( path )) )" )
+                lines.append( "        let \(variable) = endpoint( \(pathLiteral( path )) )" )
                 for (endpoint, residual) in zip( group, residuals ) {
                     if residual.isEmpty == false { lines.append( "        #if \(conjunction( residual ))" ) }
                     for method in endpoint.methods {
@@ -179,10 +179,25 @@ public struct EndpointFileGenerator
         return conditions.map { "(\($0))" }.joined( separator: " && " )
     }
 
-    func quoted( _ string: String ) -> String {
-        let escaped = string
+    func escaped( _ string: String ) -> String {
+        return string
             .replacingOccurrences( of: "\\", with: "\\\\" )
             .replacingOccurrences( of: "\"", with: "\\\"" )
-        return "\"\(escaped)\""
+    }
+
+    func quoted( _ string: String ) -> String {
+        return "\"\(escaped( string ))\""
+    }
+
+    /// The path as a Swift string literal, with every `{pattern}` replaced by
+    /// the interpolation of its constant: `:scheme{uuid}` -> `:scheme\(uuidRegexRoute)`.
+    func pathLiteral( _ path: String ) -> String {
+        let body = EndpointPathPattern.split( path ).map { piece -> String in
+            switch piece {
+            case .text( let text ):    return escaped( text )
+            case .pattern( let name ): return EndpointPathPattern.known[ name ].map { "\\(\($0))" } ?? escaped( "{\(name)}" )
+            }
+        }
+        return "\"\(body.joined())\""
     }
 }

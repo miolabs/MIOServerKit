@@ -26,6 +26,7 @@ public struct EndpointAnnotation: Equatable
         case invalidPath
         case unsupportedMethod(String)
         case emptyMethods
+        case unknownPathPattern(String)
 
         public var description: String {
             switch self {
@@ -33,6 +34,7 @@ public struct EndpointAnnotation: Equatable
             case .invalidPath:                  return "@Endpoint path must be a plain string literal (no interpolation)"
             case .unsupportedMethod(let m):     return "@Endpoint does not support method '.\(m)'. Supported: \(supportedMethods.map { ".\($0)" }.joined(separator: ", "))"
             case .emptyMethods:                 return "@Endpoint methods array cannot be empty"
+            case .unknownPathPattern(let p):    return "@Endpoint path uses unknown path pattern '\(p)'. Supported: \(EndpointPathPattern.known.keys.sorted().map { "{\($0)}" }.joined(separator: ", "))"
             }
         }
 
@@ -83,6 +85,10 @@ public struct EndpointAnnotation: Equatable
 
         guard let p = path, p.isEmpty == false else { throw ParseError.missingPath }
 
+        for case .pattern( let name ) in EndpointPathPattern.split( p ) where EndpointPathPattern.known[ name ] == nil {
+            throw ParseError.unknownPathPattern( name )
+        }
+
         return EndpointAnnotation( methods: methods.isEmpty ? ["get"] : methods, path: p )
     }
 
@@ -93,5 +99,66 @@ public struct EndpointAnnotation: Equatable
               let segment = literal.segments.first?.as( StringSegmentSyntax.self )
         else { throw ParseError.invalidPath }
         return segment.content.text
+    }
+}
+
+
+/// Named patterns for path variables: `:scheme{uuid}`.
+///
+/// An @Endpoint path must be a plain string literal, so it cannot interpolate
+/// the regex constants a hand-written route uses (`":scheme\(uuidRegexRoute)"`).
+/// A pattern name stands for one of those constants: the generated file emits
+/// the very same interpolation, so an annotated route and a hand-written one
+/// resolve to the same route node and the regex keeps a single definition.
+public enum EndpointPathPattern
+{
+    /// Pattern name -> the Swift constant (declared in MIOServerKit) it expands to.
+    public static let known: [String: String] = [
+        "uuid": "uuidRegexRoute",
+    ]
+
+    public enum Piece: Equatable
+    {
+        case text(String)
+        case pattern(String)
+    }
+
+    /// Splits a path into literal text and pattern names. A pattern is a
+    /// `{name}` that comes right after a variable name (`:scheme{uuid}`);
+    /// braces anywhere else, such as a `{8}` quantifier of an inline regex
+    /// (`:code([0-9a-f]{8})`), are plain text.
+    public static func split( _ path: String ) -> [Piece]
+    {
+        var pieces: [Piece] = []
+        var text = ""
+        var inVarName = false   // between the ':' of a variable and the end of its name
+
+        func isNameChar( _ c: Character ) -> Bool { return c.isLetter || c.isNumber || c == "_" }
+
+        var index = path.startIndex
+        while index < path.endIndex {
+            let c = path[ index ]
+
+            if c == "{", inVarName,
+               let close = path[ index... ].firstIndex( of: "}" ) {
+                let name = String( path[ path.index( after: index ) ..< close ] )
+                if name.isEmpty == false && name.allSatisfy( isNameChar ) && name.first!.isNumber == false {
+                    if text.isEmpty == false { pieces.append( .text( text ) ); text = "" }
+                    pieces.append( .pattern( name ) )
+                    index = path.index( after: close )
+                    inVarName = false
+                    continue
+                }
+            }
+
+            if c == ":" { inVarName = true }
+            else if isNameChar( c ) == false { inVarName = false }
+
+            text.append( c )
+            index = path.index( after: index )
+        }
+
+        if text.isEmpty == false { pieces.append( .text( text ) ) }
+        return pieces
     }
 }
